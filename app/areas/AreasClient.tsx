@@ -3,16 +3,27 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Area } from '@/lib/types'
 import Nav from '@/components/Nav'
+import PriorityBadge from '@/components/PriorityBadge'
+import DeadlineBadge from '@/components/DeadlineBadge'
 import { createClient } from '@/lib/supabase/client'
-import { Tag, Plus, Pencil, Trash2, X } from 'lucide-react'
-
-type AreaWithCounts = Area & { project_count: number; task_count: number }
+import { Tag, Plus, Pencil, Trash2, ChevronRight, Circle, CheckCircle2, PlayCircle, LayoutGrid, CheckSquare } from 'lucide-react'
 
 const COLORS = ['#6c5ce7','#e53e3e','#38a169','#f97316','#3182ce','#d53f8c','#805ad5','#0891b2']
 
-export default function AreasClient({ areas, userId }: { areas: AreaWithCounts[]; userId: string }) {
+type ProjectSnippet = { id: string; name: string; color: string; status: string; priority: string }
+type TaskSnippet = { id: string; title: string; status: string; priority: string; deadline: string | null; project_id: string }
+type AreaWithContent = Area & { projects: ProjectSnippet[]; tasks: TaskSnippet[]; project_count: number; task_count: number }
+
+const statusIcon = (s: string) => {
+  if (s === 'done') return <CheckCircle2 size={13} color="var(--accent)" />
+  if (s === 'in_progress') return <PlayCircle size={13} color="var(--accent)" />
+  return <Circle size={13} color="var(--text-dim)" />
+}
+
+export default function AreasClient({ areas, userId }: { areas: AreaWithContent[]; userId: string }) {
   const [showNew, setShowNew] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [color, setColor] = useState('#6c5ce7')
   const router = useRouter()
@@ -35,8 +46,17 @@ export default function AreasClient({ areas, userId }: { areas: AreaWithCounts[]
     router.refresh()
   }
 
-  function startEdit(a: AreaWithCounts) {
+  function startEdit(a: AreaWithContent) {
     setEditingId(a.id); setName(a.name); setColor(a.color)
+  }
+
+  function toggleExpand(id: string) {
+    setExpandedId(expandedId === id ? null : id)
+  }
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.06em',
+    textTransform: 'uppercase', marginBottom: 8, marginTop: 14, display: 'block',
   }
 
   return (
@@ -55,7 +75,7 @@ export default function AreasClient({ areas, userId }: { areas: AreaWithCounts[]
       </div>
 
       <p style={{ fontSize: 13, color: 'var(--text-muted)', padding: '0 20px 16px' }}>
-        Areas of responsibility let you tag projects and tasks across different life domains — like Work, Health, or Finance.
+        Tag projects and tasks by life domain — like Work, Health, or Finance.
       </p>
 
       {showNew && (
@@ -88,50 +108,114 @@ export default function AreasClient({ areas, userId }: { areas: AreaWithCounts[]
           </div>
         )}
 
-        {areas.map(a => (
-          <div key={a.id} style={{
-            background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: 14, padding: '14px 16px', marginBottom: 10,
-            borderLeft: `3px solid ${a.color}`,
-          }}>
-            {editingId === a.id ? (
-              <div>
-                <input value={name} onChange={e => setName(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') updateArea(a.id); if (e.key === 'Escape') setEditingId(null) }}
-                  style={{ width: '100%', marginBottom: 10 }} />
-                <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-                  {COLORS.map(c => (
-                    <button key={c} onClick={() => setColor(c)} style={{
-                      width: 24, height: 24, borderRadius: '50%', background: c,
-                      border: color === c ? '3px solid #fff' : '3px solid transparent',
-                      outline: color === c ? `2px solid ${c}` : 'none',
-                    }} />
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => setEditingId(null)} style={{ flex: 1, padding: '8px', background: 'var(--surface2)', color: 'var(--text-muted)', borderRadius: 8, fontWeight: 600 }}>Cancel</button>
-                  <button onClick={() => updateArea(a.id)} style={{ flex: 2, padding: '8px', background: 'var(--accent)', color: '#fff', borderRadius: 8, fontWeight: 600 }}>Save</button>
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: a.color, display: 'inline-block' }} />
-                    <span style={{ fontWeight: 600, fontSize: 15 }}>{a.name}</span>
+        {areas.map(a => {
+          const isExpanded = expandedId === a.id
+          const isEditing = editingId === a.id
+          const hasContent = a.project_count > 0 || a.task_count > 0
+
+          return (
+            <div key={a.id} style={{
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 14, marginBottom: 10,
+              borderLeft: `3px solid ${a.color}`,
+              overflow: 'hidden',
+            }}>
+              {/* Header row */}
+              <div style={{ padding: '14px 16px' }}>
+                {isEditing ? (
+                  <div>
+                    <input value={name} onChange={e => setName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') updateArea(a.id); if (e.key === 'Escape') setEditingId(null) }}
+                      style={{ width: '100%', marginBottom: 10 }} />
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                      {COLORS.map(c => (
+                        <button key={c} onClick={() => setColor(c)} style={{
+                          width: 24, height: 24, borderRadius: '50%', background: c,
+                          border: color === c ? '3px solid #fff' : '3px solid transparent',
+                          outline: color === c ? `2px solid ${c}` : 'none',
+                        }} />
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => setEditingId(null)} style={{ flex: 1, padding: '8px', background: 'var(--surface2)', color: 'var(--text-muted)', borderRadius: 8, fontWeight: 600 }}>Cancel</button>
+                      <button onClick={() => updateArea(a.id)} style={{ flex: 2, padding: '8px', background: 'var(--accent)', color: '#fff', borderRadius: 8, fontWeight: 600 }}>Save</button>
+                    </div>
                   </div>
-                  <p style={{ fontSize: 12, color: 'var(--text-dim)', paddingLeft: 18 }}>
-                    {a.project_count} project{a.project_count !== 1 ? 's' : ''} · {a.task_count} task{a.task_count !== 1 ? 's' : ''}
-                  </p>
-                </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button onClick={() => startEdit(a)} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px', color: 'var(--text-muted)', display: 'flex' }}><Pencil size={14} /></button>
-                  <button onClick={() => deleteArea(a.id)} style={{ background: 'rgba(229,62,62,0.1)', border: '1px solid rgba(229,62,62,0.2)', borderRadius: 8, padding: '7px', color: 'var(--red)', display: 'flex' }}><Trash2 size={14} /></button>
-                </div>
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ cursor: hasContent ? 'pointer' : 'default', flex: 1 }} onClick={() => hasContent && toggleExpand(a.id)}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                        <span style={{ width: 10, height: 10, borderRadius: '50%', background: a.color, display: 'inline-block', flexShrink: 0 }} />
+                        <span style={{ fontWeight: 600, fontSize: 15 }}>{a.name}</span>
+                        {hasContent && (
+                          <ChevronRight size={15} color="var(--text-dim)" style={{
+                            transform: isExpanded ? 'rotate(90deg)' : 'none',
+                            transition: 'transform 0.15s',
+                          }} />
+                        )}
+                      </div>
+                      <p style={{ fontSize: 12, color: 'var(--text-dim)', paddingLeft: 18 }}>
+                        {a.project_count} project{a.project_count !== 1 ? 's' : ''} · {a.task_count} task{a.task_count !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => startEdit(a)} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px', color: 'var(--text-muted)', display: 'flex' }}><Pencil size={14} /></button>
+                      <button onClick={() => deleteArea(a.id)} style={{ background: 'rgba(229,62,62,0.1)', border: '1px solid rgba(229,62,62,0.2)', borderRadius: 8, padding: '7px', color: 'var(--red)', display: 'flex' }}><Trash2 size={14} /></button>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        ))}
+
+              {/* Expanded content */}
+              {isExpanded && !isEditing && (
+                <div style={{ borderTop: '1px solid var(--border)', background: 'var(--surface2)', padding: '12px 16px' }}>
+                  {a.projects.length > 0 && (
+                    <>
+                      <span style={labelStyle}><LayoutGrid size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />Projects</span>
+                      {a.projects.map(p => (
+                        <div key={p.id} onClick={() => router.push(`/projects/${p.id}`)} style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '8px 10px', borderRadius: 9, marginBottom: 4,
+                          background: 'var(--surface)', border: '1px solid var(--border)',
+                          cursor: 'pointer', borderLeft: `3px solid ${p.color}`,
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <p style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</p>
+                            <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2, textTransform: 'capitalize' }}>{p.status}</p>
+                          </div>
+                          <PriorityBadge priority={p.priority as never} />
+                          <ChevronRight size={13} color="var(--text-dim)" />
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  {a.tasks.length > 0 && (
+                    <>
+                      <span style={labelStyle}><CheckSquare size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />Tasks</span>
+                      {a.tasks.map(t => (
+                        <div key={t.id} onClick={() => router.push(`/projects/${t.project_id}`)} style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '8px 10px', borderRadius: 9, marginBottom: 4,
+                          background: 'var(--surface)', border: '1px solid var(--border)',
+                          cursor: 'pointer',
+                          opacity: t.status === 'done' ? 0.55 : 1,
+                        }}>
+                          {statusIcon(t.status)}
+                          <div style={{ flex: 1 }}>
+                            <p style={{ fontSize: 13, fontWeight: 500, textDecoration: t.status === 'done' ? 'line-through' : 'none' }}>{t.title}</p>
+                          </div>
+                          <DeadlineBadge date={t.deadline} />
+                          <PriorityBadge priority={t.priority as never} />
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
       <Nav />
     </div>
