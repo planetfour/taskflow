@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutGrid, CheckSquare, LogOut } from 'lucide-react'
+import { LayoutGrid, CheckSquare, Tag, LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
@@ -18,6 +18,7 @@ export default function Nav() {
   const tabs = [
     { href: '/', label: 'Projects', icon: LayoutGrid },
     { href: '/tasks', label: 'All Tasks', icon: CheckSquare },
+    { href: '/areas', label: 'Areas', icon: Tag },
   ]
 
   return (
@@ -33,7 +34,7 @@ export default function Nav() {
         return (
           <Link key={href} href={href} style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
-            gap: 3, padding: '4px 24px', textDecoration: 'none',
+            gap: 3, padding: '4px 20px', textDecoration: 'none',
             color: active ? 'var(--accent)' : 'var(--text-muted)',
             transition: 'color 0.15s',
           }}>
@@ -44,11 +45,11 @@ export default function Nav() {
       })}
       <button onClick={signOut} style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        gap: 3, padding: '4px 24px', background: 'none',
+        gap: 3, padding: '4px 20px', background: 'none',
         color: 'var(--text-muted)',
       }}>
         <LogOut size={22} />
-        <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Sign out</span>
+        <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Out</span>
       </button>
     </nav>
   )

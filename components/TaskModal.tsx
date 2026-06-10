@@ -1,21 +1,32 @@
 'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Priority } from '@/lib/types'
+import { Priority, Area, RecurrenceType } from '@/lib/types'
 import { X } from 'lucide-react'
+import AreaPicker from './AreaPicker'
+import RecurrencePicker from './RecurrencePicker'
 
 interface Props {
   projectId: string
   userId: string
+  allAreas: Area[]
   onClose: () => void
   onSaved: () => void
 }
 
-export default function TaskModal({ projectId, userId, onClose, onSaved }: Props) {
+const labelStyle: React.CSSProperties = {
+  fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.06em',
+  textTransform: 'uppercase', display: 'block', marginBottom: 6,
+}
+
+export default function TaskModal({ projectId, userId, allAreas, onClose, onSaved }: Props) {
   const [title, setTitle] = useState('')
   const [notes, setNotes] = useState('')
   const [priority, setPriority] = useState<Priority>('medium')
   const [deadline, setDeadline] = useState('')
+  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType | null>(null)
+  const [recurrenceInterval, setRecurrenceInterval] = useState<number | null>(null)
+  const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const supabase = createClient()
@@ -23,14 +34,20 @@ export default function TaskModal({ projectId, userId, onClose, onSaved }: Props
   async function handleSave() {
     if (!title.trim()) { setError('Title is required'); return }
     setLoading(true)
-    const { error } = await supabase.from('tasks').insert({
+    const { data, error } = await supabase.from('tasks').insert({
       title: title.trim(), notes: notes.trim() || null,
       priority, deadline: deadline || null,
       project_id: projectId, user_id: userId,
       status: 'todo', parent_task_id: null,
-    })
+      recurrence_type: recurrenceType,
+      recurrence_interval: recurrenceInterval,
+    }).select().single()
+    if (error) { setError(error.message); setLoading(false); return }
+
+    if (data && selectedAreaIds.length > 0) {
+      await supabase.from('task_areas').insert(selectedAreaIds.map(area_id => ({ task_id: data.id, area_id })))
+    }
     setLoading(false)
-    if (error) { setError(error.message); return }
     onSaved()
   }
 
@@ -40,6 +57,7 @@ export default function TaskModal({ projectId, userId, onClose, onSaved }: Props
         background: 'var(--surface)', borderRadius: '20px 20px 0 0',
         border: '1px solid var(--border)', borderBottom: 'none',
         padding: '24px', width: '100%', maxWidth: 480,
+        maxHeight: '92vh', overflowY: 'auto',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h2 style={{ fontWeight: 700, fontSize: 17 }}>New task</h2>
@@ -72,6 +90,15 @@ export default function TaskModal({ projectId, userId, onClose, onSaved }: Props
               <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} style={{ width: '100%' }} />
             </div>
           </div>
+          <div>
+            <label style={labelStyle}>Recurrence</label>
+            <RecurrencePicker type={recurrenceType} interval={recurrenceInterval}
+              onChange={(t, i) => { setRecurrenceType(t); setRecurrenceInterval(i) }} />
+          </div>
+          <div>
+            <label style={labelStyle}>Areas</label>
+            <AreaPicker allAreas={allAreas} selectedIds={selectedAreaIds} onChange={setSelectedAreaIds} userId={userId} />
+          </div>
 
           {error && <p style={{ color: 'var(--red)', fontSize: 13 }}>{error}</p>}
 
@@ -83,9 +110,4 @@ export default function TaskModal({ projectId, userId, onClose, onSaved }: Props
       </div>
     </div>
   )
-}
-
-const labelStyle: React.CSSProperties = {
-  fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.06em',
-  textTransform: 'uppercase', display: 'block', marginBottom: 6,
 }

@@ -1,33 +1,50 @@
 'use client'
 import { useState } from 'react'
-import { Task } from '@/lib/types'
+import { Task, Area } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import PriorityBadge from './PriorityBadge'
 import DeadlineBadge from './DeadlineBadge'
-import { ChevronRight, Plus, Trash2 } from 'lucide-react'
+import AreaTag from './AreaTag'
+import TaskEditModal from './TaskEditModal'
+import { ChevronRight, Plus, RotateCcw } from 'lucide-react'
+import { nextDueDate, formatCompletedAt } from '@/lib/utils'
 
 interface Props {
   task: Task
+  allAreas: Area[]
   depth?: number
   onRefresh: () => void
   userId: string
 }
 
-export default function TaskItem({ task, depth = 0, onRefresh, userId }: Props) {
+export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [addingSubtask, setAddingSubtask] = useState(false)
   const [subtaskTitle, setSubtaskTitle] = useState('')
+  const [editing, setEditing] = useState(false)
   const supabase = createClient()
   const hasSubtasks = task.subtasks && task.subtasks.length > 0
 
   async function toggleStatus() {
     const next = task.status === 'done' ? 'todo' : task.status === 'todo' ? 'in_progress' : 'done'
-    await supabase.from('tasks').update({ status: next }).eq('id', task.id)
-    onRefresh()
-  }
+    const completedAt = next === 'done' ? new Date().toISOString() : null
 
-  async function deleteTask() {
-    await supabase.from('tasks').delete().eq('id', task.id)
+    await supabase.from('tasks').update({ status: next, completed_at: completedAt }).eq('id', task.id)
+
+    // If completing a recurring task, spawn next occurrence
+    if (next === 'done' && task.recurrence_type) {
+      const due = nextDueDate(task.recurrence_type, task.recurrence_interval)
+      await supabase.from('tasks').insert({
+        title: task.title, notes: task.notes,
+        priority: task.priority, status: 'todo',
+        project_id: task.project_id, user_id: userId,
+        parent_task_id: task.parent_task_id,
+        deadline: due,
+        recurrence_type: task.recurrence_type,
+        recurrence_interval: task.recurrence_interval,
+      })
+    }
+
     onRefresh()
   }
 
@@ -46,15 +63,18 @@ export default function TaskItem({ task, depth = 0, onRefresh, userId }: Props) 
 
   return (
     <div style={{ marginLeft: depth > 0 ? 20 : 0 }}>
-      <div style={{
-        background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 12, padding: '12px 14px', marginBottom: 6,
-        opacity: done ? 0.55 : 1, transition: 'opacity 0.15s',
-        borderLeft: inProgress ? '3px solid var(--accent)' : undefined,
-      }}>
+      <div
+        onClick={() => setEditing(true)}
+        style={{
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 12, padding: '12px 14px', marginBottom: 6,
+          opacity: done ? 0.6 : 1, transition: 'opacity 0.15s',
+          borderLeft: inProgress ? '3px solid var(--accent)' : undefined,
+          cursor: 'pointer',
+        }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
           {/* Status toggle */}
-          <button onClick={toggleStatus} style={{
+          <button onClick={e => { e.stopPropagation(); toggleStatus() }} style={{
             width: 20, height: 20, borderRadius: '50%', flexShrink: 0, marginTop: 2,
             border: `2px solid ${done ? 'var(--accent)' : inProgress ? 'var(--accent)' : 'var(--border)'}`,
             background: done ? 'var(--accent)' : inProgress ? 'var(--accent-dim)' : 'transparent',
@@ -67,14 +87,19 @@ export default function TaskItem({ task, depth = 0, onRefresh, userId }: Props) 
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ fontSize: 14, fontWeight: 500, textDecoration: done ? 'line-through' : 'none', color: done ? 'var(--text-muted)' : 'var(--text)' }}>
               {task.title}
+              {task.recurrence_type && <RotateCcw size={11} style={{ marginLeft: 5, color: 'var(--accent)', display: 'inline', verticalAlign: 'middle' }} />}
             </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
               <PriorityBadge priority={task.priority} />
               <DeadlineBadge date={task.deadline} />
+              {done && task.completed_at && (
+                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Done {formatCompletedAt(task.completed_at)}</span>
+              )}
+              {(task.areas ?? []).map(a => <AreaTag key={a.id} area={a} />)}
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 4 }}>
+          <div style={{ display: 'flex', gap: 2 }} onClick={e => e.stopPropagation()}>
             {depth < 2 && (
               <button onClick={() => setAddingSubtask(!addingSubtask)} style={{
                 background: 'none', color: 'var(--text-dim)', padding: 4, borderRadius: 6, display: 'flex',
@@ -86,9 +111,6 @@ export default function TaskItem({ task, depth = 0, onRefresh, userId }: Props) 
                 transform: expanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s',
               }}><ChevronRight size={15} /></button>
             )}
-            <button onClick={deleteTask} style={{
-              background: 'none', color: 'var(--text-dim)', padding: 4, borderRadius: 6, display: 'flex',
-            }}><Trash2 size={15} /></button>
           </div>
         </div>
 
@@ -97,7 +119,7 @@ export default function TaskItem({ task, depth = 0, onRefresh, userId }: Props) 
         )}
 
         {addingSubtask && (
-          <div style={{ marginTop: 10, marginLeft: 30, display: 'flex', gap: 8 }}>
+          <div style={{ marginTop: 10, marginLeft: 30, display: 'flex', gap: 8 }} onClick={e => e.stopPropagation()}>
             <input
               autoFocus value={subtaskTitle} onChange={e => setSubtaskTitle(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') addSubtask(); if (e.key === 'Escape') setAddingSubtask(false) }}
@@ -109,8 +131,17 @@ export default function TaskItem({ task, depth = 0, onRefresh, userId }: Props) 
       </div>
 
       {expanded && hasSubtasks && task.subtasks!.map(sub => (
-        <TaskItem key={sub.id} task={sub} depth={depth + 1} onRefresh={onRefresh} userId={userId} />
+        <TaskItem key={sub.id} task={sub} allAreas={allAreas} depth={depth + 1} onRefresh={onRefresh} userId={userId} />
       ))}
+
+      {editing && (
+        <TaskEditModal
+          task={task} allAreas={allAreas} userId={userId}
+          onClose={() => setEditing(false)}
+          onSaved={() => { setEditing(false); onRefresh() }}
+          onAreasChanged={onRefresh}
+        />
+      )}
     </div>
   )
 }

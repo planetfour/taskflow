@@ -1,6 +1,15 @@
 export type Priority = 'low' | 'medium' | 'high' | 'urgent'
 export type ProjectStatus = 'active' | 'paused' | 'completed' | 'archived'
 export type TaskStatus = 'todo' | 'in_progress' | 'done'
+export type RecurrenceType = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'custom'
+
+export interface Area {
+  id: string
+  created_at: string
+  name: string
+  color: string
+  user_id: string
+}
 
 export interface Project {
   id: string
@@ -14,6 +23,7 @@ export interface Project {
   user_id: string
   task_count?: number
   completed_count?: number
+  areas?: Area[]
 }
 
 export interface Task {
@@ -26,7 +36,12 @@ export interface Task {
   priority: Priority
   status: TaskStatus
   deadline: string | null
+  completed_at: string | null
+  recurrence_type: RecurrenceType | null
+  recurrence_interval: number | null
+  recurrence_next_due: string | null
   sort_order: number
   user_id: string
   subtasks?: Task[]
+  areas?: Area[]
 }

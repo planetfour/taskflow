@@ -1,25 +1,33 @@
 'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Project, Priority, ProjectStatus } from '@/lib/types'
+import { Project, Priority, ProjectStatus, Area } from '@/lib/types'
 import { X } from 'lucide-react'
+import AreaPicker from './AreaPicker'
 
 const COLORS = ['#6c5ce7','#e53e3e','#38a169','#f97316','#3182ce','#d53f8c','#805ad5','#2b6cb0']
 
 interface Props {
   project?: Project
+  allAreas: Area[]
   onClose: () => void
   onSaved: () => void
   userId: string
 }
 
-export default function ProjectModal({ project, onClose, onSaved, userId }: Props) {
+const labelStyle: React.CSSProperties = {
+  fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.06em',
+  textTransform: 'uppercase', display: 'block', marginBottom: 6,
+}
+
+export default function ProjectModal({ project, allAreas, onClose, onSaved, userId }: Props) {
   const [name, setName] = useState(project?.name ?? '')
   const [description, setDescription] = useState(project?.description ?? '')
   const [color, setColor] = useState(project?.color ?? '#6c5ce7')
   const [priority, setPriority] = useState<Priority>(project?.priority ?? 'medium')
   const [status, setStatus] = useState<ProjectStatus>(project?.status ?? 'active')
   const [deadline, setDeadline] = useState(project?.deadline ?? '')
+  const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>((project?.areas ?? []).map(a => a.id))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const supabase = createClient()
@@ -31,11 +39,25 @@ export default function ProjectModal({ project, onClose, onSaved, userId }: Prop
       name: name.trim(), description: description.trim() || null,
       color, priority, status, deadline: deadline || null, user_id: userId,
     }
-    const { error } = project
-      ? await supabase.from('projects').update(payload).eq('id', project.id)
-      : await supabase.from('projects').insert(payload)
+    let projectId = project?.id
+    if (project) {
+      const { error } = await supabase.from('projects').update(payload).eq('id', project.id)
+      if (error) { setError(error.message); setLoading(false); return }
+    } else {
+      const { data, error } = await supabase.from('projects').insert(payload).select().single()
+      if (error) { setError(error.message); setLoading(false); return }
+      projectId = data.id
+    }
+
+    // Update area associations
+    if (projectId) {
+      await supabase.from('project_areas').delete().eq('project_id', projectId)
+      if (selectedAreaIds.length > 0) {
+        await supabase.from('project_areas').insert(selectedAreaIds.map(area_id => ({ project_id: projectId, area_id })))
+      }
+    }
+
     setLoading(false)
-    if (error) { setError(error.message); return }
     onSaved()
   }
 
@@ -47,12 +69,12 @@ export default function ProjectModal({ project, onClose, onSaved, userId }: Prop
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 100, padding: '0' }} onClick={onClose}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 100 }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{
         background: 'var(--surface)', borderRadius: '20px 20px 0 0',
         border: '1px solid var(--border)', borderBottom: 'none',
         padding: '24px', width: '100%', maxWidth: 480,
-        maxHeight: '90vh', overflowY: 'auto',
+        maxHeight: '92vh', overflowY: 'auto',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h2 style={{ fontWeight: 700, fontSize: 17 }}>{project ? 'Edit project' : 'New project'}</h2>
@@ -73,7 +95,8 @@ export default function ProjectModal({ project, onClose, onSaved, userId }: Prop
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {COLORS.map(c => (
                 <button key={c} onClick={() => setColor(c)} style={{
-                  width: 28, height: 28, borderRadius: '50%', background: c, border: color === c ? '3px solid #fff' : '3px solid transparent',
+                  width: 28, height: 28, borderRadius: '50%', background: c,
+                  border: color === c ? '3px solid #fff' : '3px solid transparent',
                   outline: color === c ? `2px solid ${c}` : 'none', cursor: 'pointer',
                 }} />
               ))}
@@ -103,6 +126,10 @@ export default function ProjectModal({ project, onClose, onSaved, userId }: Prop
             <label style={labelStyle}>Deadline</label>
             <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} style={{ width: '100%' }} />
           </div>
+          <div>
+            <label style={labelStyle}>Areas of Responsibility</label>
+            <AreaPicker allAreas={allAreas} selectedIds={selectedAreaIds} onChange={setSelectedAreaIds} userId={userId} onAreasChanged={onSaved} />
+          </div>
 
           {error && <p style={{ color: 'var(--red)', fontSize: 13 }}>{error}</p>}
 
@@ -123,9 +150,4 @@ export default function ProjectModal({ project, onClose, onSaved, userId }: Prop
       </div>
     </div>
   )
-}
-
-const labelStyle: React.CSSProperties = {
-  fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.06em',
-  textTransform: 'uppercase', display: 'block', marginBottom: 6,
 }

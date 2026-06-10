@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { Task } from '@/lib/types'
+import { Task, Area } from '@/lib/types'
 import ProjectDetailClient from './ProjectDetailClient'
 
 function nestTasks(tasks: Task[]): Task[] {
@@ -26,8 +26,26 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const { data: project } = await supabase.from('projects').select('*').eq('id', id).eq('user_id', user.id).single()
   if (!project) redirect('/')
 
+  const { data: projectAreaRows } = await supabase.from('project_areas').select('areas(*)').eq('project_id', id)
+  const projectAreas = (projectAreaRows ?? []).map((r: { areas: unknown }) => r.areas).flat() as Area[]
+
   const { data: tasks } = await supabase.from('tasks').select('*').eq('project_id', id).eq('user_id', user.id).order('sort_order').order('created_at')
 
-  const nested = nestTasks((tasks ?? []) as Task[])
-  return <ProjectDetailClient project={project} tasks={nested} userId={user.id} />
+  // Attach areas to tasks
+  const taskIds = (tasks ?? []).map(t => t.id)
+  let taskAreaMap: Record<string, Area[]> = {}
+  if (taskIds.length > 0) {
+    const { data: taskAreaRows } = await supabase.from('task_areas').select('task_id, areas(*)').in('task_id', taskIds)
+    ;(taskAreaRows ?? []).forEach((r: { task_id: string; areas: unknown }) => {
+      if (!taskAreaMap[r.task_id]) taskAreaMap[r.task_id] = []
+      taskAreaMap[r.task_id].push(r.areas as Area)
+    })
+  }
+
+  const tasksWithAreas = (tasks ?? []).map(t => ({ ...t, areas: taskAreaMap[t.id] ?? [] })) as Task[]
+  const nested = nestTasks(tasksWithAreas)
+
+  const { data: allAreas } = await supabase.from('areas').select('*').eq('user_id', user.id).order('name')
+
+  return <ProjectDetailClient project={{ ...project, areas: projectAreas }} tasks={nested} allAreas={allAreas ?? []} userId={user.id} />
 }

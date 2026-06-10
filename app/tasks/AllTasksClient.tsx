@@ -1,32 +1,53 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Task, Priority, TaskStatus } from '@/lib/types'
+import { Task, Area, Priority, TaskStatus } from '@/lib/types'
 import Nav from '@/components/Nav'
 import PriorityBadge from '@/components/PriorityBadge'
 import DeadlineBadge from '@/components/DeadlineBadge'
+import AreaTag from '@/components/AreaTag'
+import TaskEditModal from '@/components/TaskEditModal'
 import { createClient } from '@/lib/supabase/client'
-import { CheckSquare, Circle, CheckCircle2, PlayCircle } from 'lucide-react'
+import { CheckSquare, Circle, CheckCircle2, PlayCircle, RotateCcw } from 'lucide-react'
+import { nextDueDate, formatCompletedAt } from '@/lib/utils'
 
 type TaskWithProject = Task & { projects: { name: string; color: string } }
 
-interface Props { tasks: TaskWithProject[]; userId: string }
+interface Props { tasks: TaskWithProject[]; allAreas: Area[]; userId: string }
 
-export default function AllTasksClient({ tasks, userId }: Props) {
+export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
   const [filterStatus, setFilterStatus] = useState<TaskStatus | 'all'>('all')
-  const [filterPriority, setFilterPriority] = useState<Priority | 'all'>('all')
+  const [filterAreaId, setFilterAreaId] = useState<string | 'all'>('all')
+  const [filterCompletedDate, setFilterCompletedDate] = useState('')
+  const [editingTask, setEditingTask] = useState<TaskWithProject | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
   const filtered = tasks.filter(t => {
     if (filterStatus !== 'all' && t.status !== filterStatus) return false
-    if (filterPriority !== 'all' && t.priority !== filterPriority) return false
+    if (filterAreaId !== 'all' && !(t.areas ?? []).some(a => a.id === filterAreaId)) return false
+    if (filterCompletedDate && t.completed_at) {
+      const completedDay = t.completed_at.split('T')[0]
+      if (completedDay !== filterCompletedDate) return false
+    } else if (filterCompletedDate && !t.completed_at) {
+      return false
+    }
     return true
   })
 
   async function toggleStatus(task: TaskWithProject) {
     const next = task.status === 'done' ? 'todo' : task.status === 'todo' ? 'in_progress' : 'done'
-    await supabase.from('tasks').update({ status: next }).eq('id', task.id)
+    const completedAt = next === 'done' ? new Date().toISOString() : null
+    await supabase.from('tasks').update({ status: next, completed_at: completedAt }).eq('id', task.id)
+
+    if (next === 'done' && task.recurrence_type) {
+      const due = nextDueDate(task.recurrence_type, task.recurrence_interval)
+      await supabase.from('tasks').insert({
+        title: task.title, notes: task.notes, priority: task.priority, status: 'todo',
+        project_id: task.project_id, user_id: userId, parent_task_id: null,
+        deadline: due, recurrence_type: task.recurrence_type, recurrence_interval: task.recurrence_interval,
+      })
+    }
     router.refresh()
   }
 
@@ -42,8 +63,8 @@ export default function AllTasksClient({ tasks, userId }: Props) {
         <h1 style={{ fontWeight: 700, fontSize: 20, letterSpacing: '-0.5px' }}>All Tasks</h1>
       </div>
 
-      {/* Filters */}
-      <div style={{ padding: '0 16px 14px', display: 'flex', gap: 8, overflowX: 'auto' }}>
+      {/* Status filters */}
+      <div style={{ padding: '0 16px 8px', display: 'flex', gap: 8, overflowX: 'auto' }}>
         {(['all','todo','in_progress','done'] as const).map(s => (
           <button key={s} onClick={() => setFilterStatus(s)} style={{
             padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
@@ -53,24 +74,50 @@ export default function AllTasksClient({ tasks, userId }: Props) {
             border: `1px solid ${filterStatus === s ? 'var(--accent)' : 'var(--border)'}`,
           }}>{statusIcons[s]}{statusLabels[s]}</button>
         ))}
-        <div style={{ width: 1, background: 'var(--border)', margin: '0 4px' }} />
-        {(['all','urgent','high','medium','low'] as const).map(p => (
-          <button key={p} onClick={() => setFilterPriority(p)} style={{
-            padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-            whiteSpace: 'nowrap',
-            background: filterPriority === p ? 'var(--surface2)' : 'var(--surface)',
-            color: filterPriority === p ? 'var(--text)' : 'var(--text-muted)',
-            border: `1px solid ${filterPriority === p ? 'var(--accent)' : 'var(--border)'}`,
-          }}>{p === 'all' ? 'All priority' : p.charAt(0).toUpperCase() + p.slice(1)}</button>
-        ))}
       </div>
 
-      <div style={{ padding: '0 16px' }}>
+      {/* Area filters */}
+      {allAreas.length > 0 && (
+        <div style={{ padding: '0 16px 8px', display: 'flex', gap: 8, overflowX: 'auto' }}>
+          <button onClick={() => setFilterAreaId('all')} style={{
+            padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
+            background: filterAreaId === 'all' ? 'var(--surface2)' : 'var(--surface)',
+            color: 'var(--text-muted)', border: '1px solid var(--border)',
+          }}>All areas</button>
+          {allAreas.map(a => (
+            <button key={a.id} onClick={() => setFilterAreaId(a.id)} style={{
+              padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
+              color: filterAreaId === a.id ? '#fff' : a.color,
+              background: filterAreaId === a.id ? a.color : `${a.color}22`,
+              border: `1px solid ${a.color}66`,
+            }}>{a.name}</button>
+          ))}
+        </div>
+      )}
+
+      {/* Completion date filter */}
+      {filterStatus === 'done' && (
+        <div style={{ padding: '0 16px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Completed on:</span>
+          <input type="date" value={filterCompletedDate} onChange={e => setFilterCompletedDate(e.target.value)}
+            style={{ fontSize: 13, padding: '5px 10px' }} />
+          {filterCompletedDate && (
+            <button onClick={() => setFilterCompletedDate('')} style={{ fontSize: 12, color: 'var(--text-muted)', background: 'none' }}>Clear</button>
+          )}
+        </div>
+      )}
+
+      <div style={{ padding: '0 16px', paddingTop: filterStatus !== 'done' ? 6 : 0 }}>
+        <p style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>
+          {filtered.length} task{filtered.length !== 1 ? 's' : ''}
+        </p>
+
         {filtered.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
             <p style={{ fontSize: 14 }}>No tasks match this filter</p>
           </div>
         )}
+
         {filtered.map(task => {
           const done = task.status === 'done'
           const inProgress = task.status === 'in_progress'
@@ -78,10 +125,10 @@ export default function AllTasksClient({ tasks, userId }: Props) {
             <div key={task.id} style={{
               background: 'var(--surface)', border: '1px solid var(--border)',
               borderRadius: 12, padding: '12px 14px', marginBottom: 8,
-              opacity: done ? 0.55 : 1,
+              opacity: done ? 0.6 : 1,
               borderLeft: inProgress ? '3px solid var(--accent)' : `3px solid ${task.projects?.color ?? 'var(--border)'}`,
               cursor: 'pointer',
-            }} onClick={() => router.push(`/projects/${task.project_id}`)}>
+            }} onClick={() => setEditingTask(task)}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                 <button onClick={e => { e.stopPropagation(); toggleStatus(task) }} style={{
                   width: 20, height: 20, borderRadius: '50%', flexShrink: 0, marginTop: 2,
@@ -92,13 +139,20 @@ export default function AllTasksClient({ tasks, userId }: Props) {
                   {done && <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>✓</span>}
                 </button>
                 <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 14, fontWeight: 500, textDecoration: done ? 'line-through' : 'none' }}>{task.title}</p>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 5 }}>
+                  <p style={{ fontSize: 14, fontWeight: 500, textDecoration: done ? 'line-through' : 'none' }}>
+                    {task.title}
+                    {task.recurrence_type && <RotateCcw size={11} style={{ marginLeft: 5, color: 'var(--accent)', display: 'inline', verticalAlign: 'middle' }} />}
+                  </p>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 5 }}>
                     {task.projects && (
                       <span style={{ fontSize: 11, color: task.projects.color, fontWeight: 600 }}>{task.projects.name}</span>
                     )}
                     <PriorityBadge priority={task.priority} />
                     <DeadlineBadge date={task.deadline} />
+                    {done && task.completed_at && (
+                      <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Done {formatCompletedAt(task.completed_at)}</span>
+                    )}
+                    {(task.areas ?? []).map(a => <AreaTag key={a.id} area={a} />)}
                   </div>
                 </div>
               </div>
@@ -106,6 +160,15 @@ export default function AllTasksClient({ tasks, userId }: Props) {
           )
         })}
       </div>
+
+      {editingTask && (
+        <TaskEditModal
+          task={editingTask} allAreas={allAreas} userId={userId}
+          onClose={() => setEditingTask(null)}
+          onSaved={() => { setEditingTask(null); router.refresh() }}
+          onAreasChanged={() => router.refresh()}
+        />
+      )}
       <Nav />
     </div>
   )
