@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, startTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Task, Area, TaskStatus } from '@/lib/types'
 import Nav from '@/components/Nav'
@@ -20,11 +20,17 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
   const [filterAreaId, setFilterAreaId] = useState<string | 'all'>('all')
   const [filterCompletedDate, setFilterCompletedDate] = useState('')
   const [editingTask, setEditingTask] = useState<TaskWithProject | null>(null)
+  const [localStatuses, setLocalStatuses] = useState<Record<string, TaskStatus>>({})
   const router = useRouter()
   const supabase = createClient()
 
+  function effectiveStatus(task: TaskWithProject): TaskStatus {
+    return localStatuses[task.id] ?? task.status
+  }
+
   const filtered = tasks.filter(t => {
-    if (filterStatus !== 'all' && t.status !== filterStatus) return false
+    const status = effectiveStatus(t)
+    if (filterStatus !== 'all' && status !== filterStatus) return false
     if (filterAreaId !== 'all' && !(t.areas ?? []).some(a => a.id === filterAreaId)) return false
     if (filterCompletedDate && t.completed_at) {
       const completedDay = t.completed_at.split('T')[0]
@@ -36,8 +42,12 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
   })
 
   async function toggleStatus(task: TaskWithProject) {
-    const next = task.status === 'done' ? 'todo' : task.status === 'todo' ? 'in_progress' : 'done'
+    const current = effectiveStatus(task)
+    const next: TaskStatus = current === 'done' ? 'todo' : current === 'todo' ? 'in_progress' : 'done'
     const completedAt = next === 'done' ? new Date().toISOString() : null
+
+    setLocalStatuses(prev => ({ ...prev, [task.id]: next })) // instant optimistic update
+
     await supabase.from('tasks').update({ status: next, completed_at: completedAt }).eq('id', task.id)
 
     if (next === 'done' && task.recurrence_type) {
@@ -48,7 +58,8 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
         deadline: due, recurrence_type: task.recurrence_type, recurrence_interval: task.recurrence_interval,
       })
     }
-    router.refresh()
+
+    startTransition(() => router.refresh()) // non-blocking background refresh
   }
 
   const statusIcons = { all: null, todo: <Circle size={13} />, in_progress: <PlayCircle size={13} />, done: <CheckCircle2 size={13} /> }
@@ -119,8 +130,9 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
         )}
 
         {filtered.map(task => {
-          const done = task.status === 'done'
-          const inProgress = task.status === 'in_progress'
+          const status = effectiveStatus(task)
+          const done = status === 'done'
+          const inProgress = status === 'in_progress'
           const areaColor = (task.areas ?? [])[0]?.color ?? '#888888'
           return (
             <div key={task.id} style={{
@@ -166,7 +178,7 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
         <TaskEditModal
           task={editingTask} allAreas={allAreas} userId={userId}
           onClose={() => setEditingTask(null)}
-          onSaved={() => { setEditingTask(null); router.refresh() }}
+          onSaved={() => { setEditingTask(null); startTransition(() => router.refresh()) }}
         />
       )}
       <Nav />

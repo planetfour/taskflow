@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, startTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Project, Task, Area, Priority, TaskStatus } from '@/lib/types'
 import Nav from '@/components/Nav'
@@ -121,12 +121,12 @@ export default function ProjectDetailClient({ project, tasks, allAreas, userId }
         )}
 
         {filtered.map(task => (
-          <TaskItem key={task.id} task={task} allAreas={allAreas} onRefresh={() => router.refresh()} userId={userId} />
+          <TaskItem key={task.id} task={task} allAreas={allAreas} onRefresh={() => startTransition(() => router.refresh())} userId={userId} />
         ))}
       </div>
 
       {showTaskModal && (
-        <TaskModal projectId={project.id} userId={userId} allAreas={allAreas} onClose={() => setShowTaskModal(false)} onSaved={() => { setShowTaskModal(false); router.refresh() }} />
+        <TaskModal projectId={project.id} userId={userId} allAreas={allAreas} onClose={() => setShowTaskModal(false)} onSaved={() => { setShowTaskModal(false); startTransition(() => router.refresh()) }} />
       )}
       {showProjectModal && (
         <ProjectModal project={project} allAreas={allAreas} userId={userId} onClose={() => setShowProjectModal(false)} onSaved={() => { setShowProjectModal(false); router.push('/') }} />

@@ -15,19 +15,37 @@ export default async function ProjectsPage() {
     supabase.from('areas').select('*').eq('user_id', user.id).order('name'),
   ])
 
-  // Parallel per-project fetches (individual queries avoid RLS join issues, Promise.all keeps it fast)
-  const projectsWithData = await Promise.all((projects ?? []).map(async (p) => {
-    const [
-      { count: total },
-      { count: done },
-      { data: paRows },
-    ] = await Promise.all([
-      supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('project_id', p.id),
-      supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('project_id', p.id).eq('status', 'done'),
-      supabase.from('project_areas').select('areas(*)').eq('project_id', p.id),
-    ])
-    const pAreas = (paRows ?? []).map((r: { areas: unknown }) => r.areas).filter(Boolean) as Area[]
-    return { ...p, task_count: total ?? 0, completed_count: done ?? 0, areas: pAreas }
+  const projectIds = (projects ?? []).map(p => p.id)
+
+  if (projectIds.length === 0) {
+    return <ProjectsClient projects={[]} allAreas={areas ?? []} userId={user.id} />
+  }
+
+  // 2 bulk queries instead of N×3 per-project queries
+  const [{ data: allTasks }, { data: paRows }] = await Promise.all([
+    supabase.from('tasks').select('project_id, status').eq('user_id', user.id),
+    supabase.from('project_areas').select('project_id, areas(*)').in('project_id', projectIds),
+  ])
+
+  const taskCounts: Record<string, { total: number; done: number }> = {}
+  ;(allTasks ?? []).forEach((t: { project_id: string; status: string }) => {
+    if (!t.project_id) return
+    if (!taskCounts[t.project_id]) taskCounts[t.project_id] = { total: 0, done: 0 }
+    taskCounts[t.project_id].total++
+    if (t.status === 'done') taskCounts[t.project_id].done++
+  })
+
+  const projectAreasMap: Record<string, Area[]> = {}
+  ;((paRows ?? []) as { project_id: string; areas: unknown }[]).forEach(r => {
+    if (!projectAreasMap[r.project_id]) projectAreasMap[r.project_id] = []
+    if (r.areas) projectAreasMap[r.project_id].push(r.areas as Area)
+  })
+
+  const projectsWithData = (projects ?? []).map(p => ({
+    ...p,
+    task_count: taskCounts[p.id]?.total ?? 0,
+    completed_count: taskCounts[p.id]?.done ?? 0,
+    areas: projectAreasMap[p.id] ?? [],
   }))
 
   return <ProjectsClient projects={projectsWithData} allAreas={areas ?? []} userId={user.id} />

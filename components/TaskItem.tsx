@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, startTransition } from 'react'
 import { Task, Area } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import PriorityBadge from './PriorityBadge'
@@ -18,6 +18,7 @@ interface Props {
 }
 
 export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId }: Props) {
+  const [localStatus, setLocalStatus] = useState(task.status)
   const [expanded, setExpanded] = useState(false)
   const [addingSubtask, setAddingSubtask] = useState(false)
   const [subtaskTitle, setSubtaskTitle] = useState('')
@@ -25,9 +26,14 @@ export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId 
   const supabase = createClient()
   const hasSubtasks = task.subtasks && task.subtasks.length > 0
 
+  // Sync local status when server data refreshes
+  useEffect(() => { setLocalStatus(task.status) }, [task.status])
+
   async function toggleStatus() {
-    const next = task.status === 'done' ? 'todo' : task.status === 'todo' ? 'in_progress' : 'done'
+    const next = localStatus === 'done' ? 'todo' : localStatus === 'todo' ? 'in_progress' : 'done'
     const completedAt = next === 'done' ? new Date().toISOString() : null
+
+    setLocalStatus(next) // instant optimistic update
 
     await supabase.from('tasks').update({ status: next, completed_at: completedAt }).eq('id', task.id)
 
@@ -44,7 +50,7 @@ export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId 
       })
     }
 
-    onRefresh()
+    startTransition(() => onRefresh()) // non-blocking background refresh
   }
 
   async function addSubtask() {
@@ -54,11 +60,12 @@ export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId 
       parent_task_id: task.id, user_id: userId,
       priority: 'medium', status: 'todo',
     })
-    setSubtaskTitle(''); setAddingSubtask(false); setExpanded(true); onRefresh()
+    setSubtaskTitle(''); setAddingSubtask(false); setExpanded(true)
+    startTransition(() => onRefresh())
   }
 
-  const done = task.status === 'done'
-  const inProgress = task.status === 'in_progress'
+  const done = localStatus === 'done'
+  const inProgress = localStatus === 'in_progress'
   const areaColor = (task.areas ?? [])[0]?.color ?? '#888888'
 
   return (
@@ -137,7 +144,7 @@ export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId 
         <TaskEditModal
           task={task} allAreas={allAreas} userId={userId}
           onClose={() => setEditing(false)}
-          onSaved={() => { setEditing(false); onRefresh() }}
+          onSaved={() => { setEditing(false); startTransition(() => onRefresh()) }}
         />
       )}
     </div>
