@@ -24,23 +24,28 @@ export default async function AllTasksPage() {
   const [taskAreaResult, paResult, allAreasResult] = await Promise.all([
     taskIds.length > 0
       ? supabase.from('task_areas').select('task_id, areas(*)').in('task_id', taskIds)
-      : Promise.resolve({ data: [] as { task_id: string; areas: unknown }[] }),
+      : Promise.resolve({ data: null }),
     projectIds.length > 0
       ? supabase.from('project_areas').select('project_id, areas(color)').in('project_id', projectIds)
-      : Promise.resolve({ data: [] as { project_id: string; areas: { color: string } | null }[] }),
+      : Promise.resolve({ data: null }),
     supabase.from('areas').select('*').eq('user_id', user.id).order('name'),
   ])
 
   const taskAreaMap: Record<string, Area[]> = {}
-  ;(taskAreaResult.data ?? []).forEach((r: { task_id: string; areas: unknown }) => {
+  ;((taskAreaResult.data ?? []) as { task_id: string; areas: unknown }[]).forEach(r => {
     if (!taskAreaMap[r.task_id]) taskAreaMap[r.task_id] = []
     taskAreaMap[r.task_id].push(r.areas as Area)
   })
 
   const projectAreaColorMap: Record<string, string> = {}
-  ;(paResult.data ?? []).forEach((r: { project_id: string; areas: { color: string } | null }) => {
-    if (!projectAreaColorMap[r.project_id] && r.areas?.color) {
-      projectAreaColorMap[r.project_id] = r.areas.color
+  // Supabase types embedded resources as arrays; handle both array and object shape
+  ;((paResult.data ?? []) as { project_id: string; areas: unknown }[]).forEach(r => {
+    const areas = r.areas
+    const color: string | undefined = Array.isArray(areas)
+      ? (areas as { color: string }[])[0]?.color
+      : (areas as { color: string } | null)?.color
+    if (color && !projectAreaColorMap[r.project_id]) {
+      projectAreaColorMap[r.project_id] = color
     }
   })
 
