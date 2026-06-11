@@ -9,6 +9,8 @@ import TaskEditModal from './TaskEditModal'
 import { ChevronRight, Plus, RotateCcw } from 'lucide-react'
 import { nextDueDate, formatCompletedAt } from '@/lib/utils'
 
+const HOLD_COLOR = '#eab308'
+
 interface Props {
   task: Task
   allAreas: Area[]
@@ -26,14 +28,13 @@ export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId 
   const supabase = createClient()
   const hasSubtasks = task.subtasks && task.subtasks.length > 0
 
-  // Sync local status when server data refreshes
   useEffect(() => { setLocalStatus(task.status) }, [task.status])
 
   async function toggleStatus() {
-    const next = localStatus === 'done' ? 'todo' : localStatus === 'todo' ? 'in_progress' : 'done'
+    const next = localStatus === 'done' ? 'todo' : localStatus === 'todo' ? 'holding' : 'done'
     const completedAt = next === 'done' ? new Date().toISOString() : null
 
-    setLocalStatus(next) // instant optimistic update
+    setLocalStatus(next)
 
     await supabase.from('tasks').update({ status: next, completed_at: completedAt }).eq('id', task.id)
 
@@ -50,7 +51,7 @@ export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId 
       })
     }
 
-    startTransition(() => onRefresh()) // non-blocking background refresh
+    startTransition(() => onRefresh())
   }
 
   async function addSubtask() {
@@ -65,7 +66,7 @@ export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId 
   }
 
   const done = localStatus === 'done'
-  const inProgress = localStatus === 'in_progress'
+  const holding = localStatus === 'holding'
   const areaColor = (task.areas ?? [])[0]?.color ?? '#888888'
 
   return (
@@ -82,12 +83,17 @@ export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId 
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
           <button onClick={e => { e.stopPropagation(); toggleStatus() }} style={{
             width: 20, height: 20, borderRadius: '50%', flexShrink: 0, marginTop: 2,
-            border: `2px solid ${done ? 'var(--accent)' : inProgress ? 'var(--accent)' : 'var(--border)'}`,
-            background: done ? 'var(--accent)' : inProgress ? 'var(--accent-dim)' : 'transparent',
+            border: `2px solid ${done ? 'var(--accent)' : holding ? HOLD_COLOR : 'var(--border)'}`,
+            background: done ? 'var(--accent)' : holding ? `${HOLD_COLOR}22` : 'transparent',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             {done && <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>✓</span>}
-            {inProgress && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', display: 'block' }} />}
+            {holding && (
+              <div style={{ display: 'flex', gap: 2 }}>
+                <span style={{ width: 2, height: 7, borderRadius: 1, background: HOLD_COLOR, display: 'block' }} />
+                <span style={{ width: 2, height: 7, borderRadius: 1, background: HOLD_COLOR, display: 'block' }} />
+              </div>
+            )}
           </button>
 
           <div style={{ flex: 1, minWidth: 0 }}>

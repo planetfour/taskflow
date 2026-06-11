@@ -128,7 +128,7 @@ export default function TaskEditModal({ task, allAreas, userId, onClose, onSaved
               <label style={labelStyle}>Status</label>
               <select value={status} onChange={e => setStatus(e.target.value as TaskStatus)} style={{ width: '100%' }}>
                 <option value="todo">To do</option>
-                <option value="in_progress">In progress</option>
+                <option value="holding">Holding</option>
                 <option value="done">Done</option>
               </select>
             </div>

@@ -9,22 +9,22 @@ import ProjectModal from '@/components/ProjectModal'
 import PriorityBadge from '@/components/PriorityBadge'
 import DeadlineBadge from '@/components/DeadlineBadge'
 import AreaTag from '@/components/AreaTag'
-import { ArrowLeft, Plus, Settings, Circle, PlayCircle, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Plus, Settings, Circle, Clock, CheckCircle2 } from 'lucide-react'
 
 interface Props { project: Project; tasks: Task[]; allAreas: Area[]; userId: string }
 
 export default function ProjectDetailClient({ project, tasks, allAreas, userId }: Props) {
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [showProjectModal, setShowProjectModal] = useState(false)
-  const [filterStatus, setFilterStatus] = useState<TaskStatus | 'all'>('all')
-  const [filterAreaId, setFilterAreaId] = useState<string | 'all'>('all')
+  const [filterStatuses, setFilterStatuses] = useState<Set<TaskStatus>>(new Set())
+  const [filterAreaIds, setFilterAreaIds] = useState<Set<string>>(new Set())
   const router = useRouter()
 
   const projectAreaColor = (project.areas ?? [])[0]?.color ?? '#888888'
   const rootTasks = tasks.filter(t => !t.parent_task_id)
   const filtered = rootTasks.filter(t => {
-    if (filterStatus !== 'all' && t.status !== filterStatus) return false
-    if (filterAreaId !== 'all' && !(t.areas ?? []).some(a => a.id === filterAreaId)) return false
+    if (filterStatuses.size > 0 && !filterStatuses.has(t.status)) return false
+    if (filterAreaIds.size > 0 && !(t.areas ?? []).some(a => filterAreaIds.has(a.id))) return false
     return true
   })
 
@@ -32,8 +32,33 @@ export default function ProjectDetailClient({ project, tasks, allAreas, userId }
   const done = rootTasks.filter(t => t.status === 'done').length
   const pct = total ? Math.round((done / total) * 100) : 0
 
-  const statusIcons = { all: null, todo: <Circle size={13} />, in_progress: <PlayCircle size={13} />, done: <CheckCircle2 size={13} /> }
-  const statusLabels = { all: 'All', todo: 'To do', in_progress: 'In progress', done: 'Done' }
+  const statusIcons: Record<TaskStatus, React.ReactNode> = {
+    todo: <Circle size={13} />,
+    holding: <Clock size={13} />,
+    done: <CheckCircle2 size={13} />,
+  }
+  const statusLabels: Record<TaskStatus, string> = { todo: 'To do', holding: 'Holding', done: 'Done' }
+
+  function toggleStatusFilter(s: TaskStatus) {
+    setFilterStatuses(prev => {
+      const next = new Set(prev)
+      if (next.has(s)) next.delete(s); else next.add(s)
+      return next
+    })
+  }
+
+  function toggleAreaFilter(id: string) {
+    setFilterAreaIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  const chipBase: React.CSSProperties = {
+    padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+    whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
+  }
 
   return (
     <div style={{ minHeight: '100vh', paddingBottom: 80 }}>
@@ -70,35 +95,47 @@ export default function ProjectDetailClient({ project, tasks, allAreas, userId }
           )}
         </div>
 
-        {/* Status filters */}
+        {/* Status filters — multi-select */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 8, overflowX: 'auto' }}>
-          {(['all','todo','in_progress','done'] as const).map(s => (
-            <button key={s} onClick={() => setFilterStatus(s)} style={{
-              padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-              whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
-              background: filterStatus === s ? 'var(--accent)' : 'var(--surface)',
-              color: filterStatus === s ? '#fff' : 'var(--text-muted)',
-              border: `1px solid ${filterStatus === s ? 'var(--accent)' : 'var(--border)'}`,
-            }}>{statusIcons[s]}{statusLabels[s]}</button>
-          ))}
+          <button onClick={() => setFilterStatuses(new Set())} style={{
+            ...chipBase,
+            background: filterStatuses.size === 0 ? 'var(--accent)' : 'var(--surface)',
+            color: filterStatuses.size === 0 ? '#fff' : 'var(--text-muted)',
+            border: `1px solid ${filterStatuses.size === 0 ? 'var(--accent)' : 'var(--border)'}`,
+          }}>All</button>
+          {(['todo', 'holding', 'done'] as TaskStatus[]).map(s => {
+            const active = filterStatuses.has(s)
+            return (
+              <button key={s} onClick={() => toggleStatusFilter(s)} style={{
+                ...chipBase,
+                background: active ? 'var(--accent)' : 'var(--surface)',
+                color: active ? '#fff' : 'var(--text-muted)',
+                border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+              }}>{statusIcons[s]}{statusLabels[s]}</button>
+            )
+          })}
         </div>
 
-        {/* Area filters */}
+        {/* Area filters — multi-select */}
         {allAreas.length > 0 && (
           <div style={{ display: 'flex', gap: 8, marginBottom: 14, overflowX: 'auto' }}>
-            <button onClick={() => setFilterAreaId('all')} style={{
-              padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
-              background: filterAreaId === 'all' ? 'var(--surface2)' : 'var(--surface)',
+            <button onClick={() => setFilterAreaIds(new Set())} style={{
+              ...chipBase,
+              background: filterAreaIds.size === 0 ? 'var(--surface2)' : 'var(--surface)',
               color: 'var(--text-muted)', border: '1px solid var(--border)',
+              fontWeight: filterAreaIds.size === 0 ? 700 : 600,
             }}>All areas</button>
-            {allAreas.map(a => (
-              <button key={a.id} onClick={() => setFilterAreaId(a.id)} style={{
-                padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
-                color: filterAreaId === a.id ? '#fff' : a.color,
-                background: filterAreaId === a.id ? a.color : `${a.color}22`,
-                border: `1px solid ${a.color}66`,
-              }}>{a.name}</button>
-            ))}
+            {allAreas.map(a => {
+              const active = filterAreaIds.has(a.id)
+              return (
+                <button key={a.id} onClick={() => toggleAreaFilter(a.id)} style={{
+                  ...chipBase,
+                  color: active ? '#fff' : a.color,
+                  background: active ? a.color : `${a.color}22`,
+                  border: `1px solid ${a.color}66`,
+                }}>{a.name}</button>
+              )
+            })}
           </div>
         )}
       </div>
@@ -116,7 +153,7 @@ export default function ProjectDetailClient({ project, tasks, allAreas, userId }
 
         {filtered.length === 0 && (
           <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)' }}>
-            <p style={{ fontSize: 14 }}>No tasks {filterStatus !== 'all' ? `with status "${filterStatus}"` : 'yet'}</p>
+            <p style={{ fontSize: 14 }}>No tasks {filterStatuses.size > 0 || filterAreaIds.size > 0 ? 'match this filter' : 'yet'}</p>
           </div>
         )}
 

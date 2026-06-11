@@ -17,6 +17,8 @@ interface Props { projects: Project[]; allAreas: Area[]; userId: string }
 
 export default function ProjectsClient({ projects, allAreas, userId }: Props) {
   const [showModal, setShowModal] = useState(false)
+  const [filterStatuses, setFilterStatuses] = useState<Set<ProjectStatus>>(new Set())
+  const [filterAreaIds, setFilterAreaIds] = useState<Set<string>>(new Set())
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const router = useRouter()
 
@@ -29,18 +31,36 @@ export default function ProjectsClient({ projects, allAreas, userId }: Props) {
   }
   const isOpen = (id: string) => !collapsed.has(id)
 
+  function toggleStatusFilter(s: ProjectStatus) {
+    setFilterStatuses(prev => {
+      const next = new Set(prev)
+      if (next.has(s)) next.delete(s); else next.add(s)
+      return next
+    })
+  }
+
+  function toggleAreaFilter(id: string) {
+    setFilterAreaIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  const filteredProjects = projects.filter(p => {
+    if (filterStatuses.size > 0 && !filterStatuses.has(p.status)) return false
+    if (filterAreaIds.size > 0 && !(p.areas ?? []).some(a => filterAreaIds.has(a.id))) return false
+    return true
+  })
+
   const areaGroups = [
     ...allAreas.map(area => ({
-      id: area.id,
-      name: area.name,
-      color: area.color,
-      projects: projects.filter(p => (p.areas ?? [])[0]?.id === area.id),
+      id: area.id, name: area.name, color: area.color,
+      projects: filteredProjects.filter(p => (p.areas ?? [])[0]?.id === area.id),
     })),
     {
-      id: '__none__',
-      name: 'No Area',
-      color: '#888888',
-      projects: projects.filter(p => (p.areas ?? []).length === 0),
+      id: '__none__', name: 'No Area', color: '#888888',
+      projects: filteredProjects.filter(p => (p.areas ?? []).length === 0),
     },
   ].filter(g => g.projects.length > 0)
 
@@ -55,9 +75,13 @@ export default function ProjectsClient({ projects, allAreas, userId }: Props) {
     }).filter(Boolean) as { status: ProjectStatus; priorityGroups: { priority: Priority; projects: Project[] }[] }[]
   }
 
+  const chipBase: React.CSSProperties = {
+    padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
+  }
+
   return (
     <div style={{ minHeight: '100vh', paddingBottom: 80 }}>
-      <div style={{ padding: '20px 20px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ padding: '20px 20px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 32, height: 32, background: 'var(--accent-dim)', border: '1px solid var(--accent)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <LayoutGrid size={16} color="var(--accent)" />
@@ -70,11 +94,57 @@ export default function ProjectsClient({ projects, allAreas, userId }: Props) {
         }}><Plus size={16} /> New</button>
       </div>
 
+      {/* Status filter chips */}
+      <div style={{ padding: '0 16px 8px', display: 'flex', gap: 8, overflowX: 'auto' }}>
+        <button onClick={() => setFilterStatuses(new Set())} style={{
+          ...chipBase,
+          background: filterStatuses.size === 0 ? 'var(--accent)' : 'var(--surface)',
+          color: filterStatuses.size === 0 ? '#fff' : 'var(--text-muted)',
+          border: `1px solid ${filterStatuses.size === 0 ? 'var(--accent)' : 'var(--border)'}`,
+        }}>All</button>
+        {STATUS_ORDER.map(s => {
+          const active = filterStatuses.has(s)
+          return (
+            <button key={s} onClick={() => toggleStatusFilter(s)} style={{
+              ...chipBase,
+              background: active ? 'var(--accent)' : 'var(--surface)',
+              color: active ? '#fff' : 'var(--text-muted)',
+              border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+            }}>{STATUS_LABELS[s]}</button>
+          )
+        })}
+      </div>
+
+      {/* Area filter chips */}
+      {allAreas.length > 0 && (
+        <div style={{ padding: '0 16px 12px', display: 'flex', gap: 8, overflowX: 'auto' }}>
+          <button onClick={() => setFilterAreaIds(new Set())} style={{
+            ...chipBase,
+            background: filterAreaIds.size === 0 ? 'var(--surface2)' : 'var(--surface)',
+            color: 'var(--text-muted)', border: '1px solid var(--border)',
+            fontWeight: filterAreaIds.size === 0 ? 700 : 600,
+          }}>All areas</button>
+          {allAreas.map(a => {
+            const active = filterAreaIds.has(a.id)
+            return (
+              <button key={a.id} onClick={() => toggleAreaFilter(a.id)} style={{
+                ...chipBase,
+                color: active ? '#fff' : a.color,
+                background: active ? a.color : `${a.color}22`,
+                border: `1px solid ${a.color}66`,
+              }}>{a.name}</button>
+            )
+          })}
+        </div>
+      )}
+
       <div style={{ padding: '0 16px' }}>
-        {projects.length === 0 && (
+        {filteredProjects.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
-            <p style={{ fontSize: 15, marginBottom: 8 }}>No projects yet</p>
-            <p style={{ fontSize: 13, color: 'var(--text-dim)' }}>Tap + New to create your first project</p>
+            {projects.length === 0
+              ? <><p style={{ fontSize: 15, marginBottom: 8 }}>No projects yet</p><p style={{ fontSize: 13, color: 'var(--text-dim)' }}>Tap + New to create your first project</p></>
+              : <p style={{ fontSize: 14 }}>No projects match this filter</p>
+            }
           </div>
         )}
 

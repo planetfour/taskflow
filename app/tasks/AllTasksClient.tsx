@@ -7,20 +7,23 @@ import DeadlineBadge from '@/components/DeadlineBadge'
 import AreaTag from '@/components/AreaTag'
 import TaskEditModal from '@/components/TaskEditModal'
 import { createClient } from '@/lib/supabase/client'
-import { CheckSquare, Circle, CheckCircle2, PlayCircle, RotateCcw, ChevronDown, ChevronRight } from 'lucide-react'
+import { CheckSquare, RotateCcw, ChevronDown, ChevronRight } from 'lucide-react'
 import { nextDueDate, formatCompletedAt } from '@/lib/utils'
+
+const HOLD_COLOR = '#eab308'
 
 type TaskWithProject = Task & { projects: { name: string; color: string } }
 
-const STATUS_ORDER: TaskStatus[] = ['todo', 'in_progress', 'done']
-const STATUS_LABELS: Record<TaskStatus, string> = { todo: 'To Do', in_progress: 'In Progress', done: 'Done' }
+const STATUS_ORDER: TaskStatus[] = ['todo', 'holding', 'done']
+const STATUS_LABELS: Record<TaskStatus, string> = { todo: 'To Do', holding: 'Holding', done: 'Done' }
 const PRIORITY_ORDER: Priority[] = ['urgent', 'high', 'medium', 'low']
 const PRIORITY_LABELS: Record<Priority, string> = { urgent: 'Urgent', high: 'High', medium: 'Medium', low: 'Low' }
 
 interface Props { tasks: TaskWithProject[]; allAreas: Area[]; userId: string }
 
 export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
-  const [filterStatus, setFilterStatus] = useState<TaskStatus | 'all'>('all')
+  const [filterStatuses, setFilterStatuses] = useState<Set<TaskStatus>>(new Set())
+  const [filterAreaIds, setFilterAreaIds] = useState<Set<string>>(new Set())
   const [filterCompletedDate, setFilterCompletedDate] = useState('')
   const [editingTask, setEditingTask] = useState<TaskWithProject | null>(null)
   const [localStatuses, setLocalStatuses] = useState<Record<string, TaskStatus>>({})
@@ -43,7 +46,8 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
 
   const filtered = tasks.filter(t => {
     const status = effectiveStatus(t)
-    if (filterStatus !== 'all' && status !== filterStatus) return false
+    if (filterStatuses.size > 0 && !filterStatuses.has(status)) return false
+    if (filterAreaIds.size > 0 && !(t.areas ?? []).some(a => filterAreaIds.has(a.id))) return false
     if (filterCompletedDate && t.completed_at) {
       if (t.completed_at.split('T')[0] !== filterCompletedDate) return false
     } else if (filterCompletedDate && !t.completed_at) {
@@ -54,15 +58,11 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
 
   const areaGroups = [
     ...allAreas.map(area => ({
-      id: area.id,
-      name: area.name,
-      color: area.color,
+      id: area.id, name: area.name, color: area.color,
       tasks: filtered.filter(t => (t.areas ?? [])[0]?.id === area.id),
     })),
     {
-      id: '__none__',
-      name: 'No Area',
-      color: '#888888',
+      id: '__none__', name: 'No Area', color: '#888888',
       tasks: filtered.filter(t => (t.areas ?? []).length === 0),
     },
   ].filter(g => g.tasks.length > 0)
@@ -80,7 +80,7 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
 
   async function toggleStatus(task: TaskWithProject) {
     const current = effectiveStatus(task)
-    const next: TaskStatus = current === 'done' ? 'todo' : current === 'todo' ? 'in_progress' : 'done'
+    const next: TaskStatus = current === 'done' ? 'todo' : current === 'todo' ? 'holding' : 'done'
     const completedAt = next === 'done' ? new Date().toISOString() : null
     setLocalStatuses(prev => ({ ...prev, [task.id]: next }))
     await supabase.from('tasks').update({ status: next, completed_at: completedAt }).eq('id', task.id)
@@ -95,7 +95,28 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
     startTransition(() => router.refresh())
   }
 
-  const statusIcons = { all: null, todo: <Circle size={13} />, in_progress: <PlayCircle size={13} />, done: <CheckCircle2 size={13} /> }
+  function toggleStatusFilter(s: TaskStatus) {
+    setFilterStatuses(prev => {
+      const next = new Set(prev)
+      if (next.has(s)) next.delete(s); else next.add(s)
+      return next
+    })
+  }
+
+  function toggleAreaFilter(id: string) {
+    setFilterAreaIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  const showDoneDate = filterStatuses.size === 0 || filterStatuses.has('done')
+
+  const chipBase: React.CSSProperties = {
+    padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+    whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
+  }
 
   return (
     <div style={{ minHeight: '100vh', paddingBottom: 80 }}>
@@ -106,19 +127,51 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
         <h1 style={{ fontWeight: 700, fontSize: 20, letterSpacing: '-0.5px' }}>All Tasks</h1>
       </div>
 
+      {/* Status filter chips */}
       <div style={{ padding: '0 16px 8px', display: 'flex', gap: 8, overflowX: 'auto' }}>
-        {(['all','todo','in_progress','done'] as const).map(s => (
-          <button key={s} onClick={() => setFilterStatus(s)} style={{
-            padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-            whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
-            background: filterStatus === s ? 'var(--accent)' : 'var(--surface)',
-            color: filterStatus === s ? '#fff' : 'var(--text-muted)',
-            border: `1px solid ${filterStatus === s ? 'var(--accent)' : 'var(--border)'}`,
-          }}>{statusIcons[s]}{{all:'All',todo:'To do',in_progress:'In progress',done:'Done'}[s]}</button>
-        ))}
+        <button onClick={() => setFilterStatuses(new Set())} style={{
+          ...chipBase,
+          background: filterStatuses.size === 0 ? 'var(--accent)' : 'var(--surface)',
+          color: filterStatuses.size === 0 ? '#fff' : 'var(--text-muted)',
+          border: `1px solid ${filterStatuses.size === 0 ? 'var(--accent)' : 'var(--border)'}`,
+        }}>All</button>
+        {STATUS_ORDER.map(s => {
+          const active = filterStatuses.has(s)
+          return (
+            <button key={s} onClick={() => toggleStatusFilter(s)} style={{
+              ...chipBase,
+              background: active ? 'var(--accent)' : 'var(--surface)',
+              color: active ? '#fff' : 'var(--text-muted)',
+              border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+            }}>{STATUS_LABELS[s]}</button>
+          )
+        })}
       </div>
 
-      {filterStatus === 'done' && (
+      {/* Area filter chips */}
+      {allAreas.length > 0 && (
+        <div style={{ padding: '0 16px 8px', display: 'flex', gap: 8, overflowX: 'auto' }}>
+          <button onClick={() => setFilterAreaIds(new Set())} style={{
+            ...chipBase,
+            background: filterAreaIds.size === 0 ? 'var(--surface2)' : 'var(--surface)',
+            color: 'var(--text-muted)', border: '1px solid var(--border)',
+            fontWeight: filterAreaIds.size === 0 ? 700 : 600,
+          }}>All areas</button>
+          {allAreas.map(a => {
+            const active = filterAreaIds.has(a.id)
+            return (
+              <button key={a.id} onClick={() => toggleAreaFilter(a.id)} style={{
+                ...chipBase,
+                color: active ? '#fff' : a.color,
+                background: active ? a.color : `${a.color}22`,
+                border: `1px solid ${a.color}66`,
+              }}>{a.name}</button>
+            )
+          })}
+        </div>
+      )}
+
+      {showDoneDate && (
         <div style={{ padding: '0 16px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Completed on:</span>
           <input type="date" value={filterCompletedDate} onChange={e => setFilterCompletedDate(e.target.value)} style={{ fontSize: 13, padding: '5px 10px' }} />
@@ -185,7 +238,7 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
                           {isOpen(priorityKey) && pg.tasks.map(task => {
                             const status = effectiveStatus(task)
                             const done = status === 'done'
-                            const inProgress = status === 'in_progress'
+                            const holding = status === 'holding'
                             return (
                               <div key={task.id} onClick={() => setEditingTask(task)} style={{
                                 background: 'var(--surface)', border: '1px solid var(--border)',
@@ -197,12 +250,17 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
                                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                                   <button onClick={e => { e.stopPropagation(); toggleStatus(task) }} style={{
                                     width: 20, height: 20, borderRadius: '50%', flexShrink: 0, marginTop: 1,
-                                    border: `2px solid ${done ? 'var(--accent)' : inProgress ? 'var(--accent)' : 'var(--border)'}`,
-                                    background: done ? 'var(--accent)' : inProgress ? 'var(--accent-dim)' : 'transparent',
+                                    border: `2px solid ${done ? 'var(--accent)' : holding ? HOLD_COLOR : 'var(--border)'}`,
+                                    background: done ? 'var(--accent)' : holding ? `${HOLD_COLOR}22` : 'transparent',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                   }}>
                                     {done && <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>✓</span>}
-                                    {inProgress && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', display: 'block' }} />}
+                                    {holding && (
+                                      <div style={{ display: 'flex', gap: 2 }}>
+                                        <span style={{ width: 2, height: 7, borderRadius: 1, background: HOLD_COLOR, display: 'block' }} />
+                                        <span style={{ width: 2, height: 7, borderRadius: 1, background: HOLD_COLOR, display: 'block' }} />
+                                      </div>
+                                    )}
                                   </button>
                                   <div style={{ flex: 1 }}>
                                     <p style={{ fontSize: 14, fontWeight: 500, textDecoration: done ? 'line-through' : 'none' }}>

@@ -7,8 +7,9 @@ import Nav from '@/components/Nav'
 import PriorityBadge from '@/components/PriorityBadge'
 import DeadlineBadge from '@/components/DeadlineBadge'
 import { createClient } from '@/lib/supabase/client'
-import { Tag, Plus, Pencil, Trash2, ChevronRight, Circle, CheckCircle2, PlayCircle, LayoutGrid, CheckSquare } from 'lucide-react'
+import { Tag, Plus, Pencil, Trash2, ChevronRight, Circle, CheckCircle2, Clock, LayoutGrid, CheckSquare } from 'lucide-react'
 
+const HOLD_COLOR = '#eab308'
 const COLORS = ['#6c5ce7','#e53e3e','#38a169','#f97316','#3182ce','#d53f8c','#805ad5','#0891b2']
 
 type ProjectSnippet = { id: string; name: string; color: string; status: string; priority: string }
@@ -17,7 +18,7 @@ type AreaWithContent = Area & { projects: ProjectSnippet[]; tasks: TaskSnippet[]
 
 const statusIcon = (s: string) => {
   if (s === 'done') return <CheckCircle2 size={13} color="var(--accent)" />
-  if (s === 'in_progress') return <PlayCircle size={13} color="var(--accent)" />
+  if (s === 'holding') return <Clock size={13} color={HOLD_COLOR} />
   return <Circle size={13} color="var(--text-dim)" />
 }
 

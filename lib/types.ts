@@ -1,6 +1,6 @@
 export type Priority = 'low' | 'medium' | 'high' | 'urgent'
 export type ProjectStatus = 'active' | 'paused' | 'completed' | 'archived'
-export type TaskStatus = 'todo' | 'in_progress' | 'done'
+export type TaskStatus = 'todo' | 'holding' | 'done'
 export type RecurrenceType = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'custom'
 
 export interface Area {
