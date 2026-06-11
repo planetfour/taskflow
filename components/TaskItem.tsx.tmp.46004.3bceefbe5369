@@ -132,7 +132,7 @@ export default function TaskItem({ task, allAreas, depth = 0, projectColor, onRe
       </div>
 
       {expanded && hasSubtasks && task.subtasks!.map(sub => (
-        <TaskItem key={sub.id} task={sub} allAreas={allAreas} depth={depth + 1} projectColor={projectColor} onRefresh={onRefresh} userId={userId} />
+        <TaskItem key={sub.id} task={sub} allAreas={allAreas} depth={depth + 1} onRefresh={onRefresh} userId={userId} />
       ))}
 
       {editing && (

@@ -18,7 +18,7 @@ interface Props {
   userId: string
 }
 
-export default function TaskItem({ task, allAreas, depth = 0, projectColor, onRefresh, userId }: Props) {
+export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [addingSubtask, setAddingSubtask] = useState(false)
   const [subtaskTitle, setSubtaskTitle] = useState('')
@@ -70,7 +70,7 @@ export default function TaskItem({ task, allAreas, depth = 0, projectColor, onRe
           background: 'var(--surface)', border: '1px solid var(--border)',
           borderRadius: 12, padding: '12px 14px', marginBottom: 6,
           opacity: done ? 0.6 : 1, transition: 'opacity 0.15s',
-          borderLeft: inProgress ? '3px solid var(--accent)' : projectColor ? `3px solid ${projectColor}` : undefined,
+          borderLeft: inProgress ? '3px solid var(--accent)' : undefined,
           cursor: 'pointer',
         }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -132,7 +132,7 @@ export default function TaskItem({ task, allAreas, depth = 0, projectColor, onRe
       </div>
 
       {expanded && hasSubtasks && task.subtasks!.map(sub => (
-        <TaskItem key={sub.id} task={sub} allAreas={allAreas} depth={depth + 1} projectColor={projectColor} onRefresh={onRefresh} userId={userId} />
+        <TaskItem key={sub.id} task={sub} allAreas={allAreas} depth={depth + 1} onRefresh={onRefresh} userId={userId} />
       ))}
 
       {editing && (

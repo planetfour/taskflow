@@ -121,7 +121,7 @@ export default function ProjectDetailClient({ project, tasks, allAreas, userId }
         )}
 
         {filtered.map(task => (
-          <TaskItem key={task.id} task={task} allAreas={allAreas} projectColor={projectAreaColor} onRefresh={() => router.refresh()} userId={userId} />
+          <TaskItem key={task.id} task={task} allAreas={allAreas} onRefresh={() => router.refresh()} userId={userId} />
         ))}
       </div>
 

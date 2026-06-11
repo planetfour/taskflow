@@ -145,7 +145,7 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
                   </p>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 5 }}>
                     {task.projects && (
-                      <span style={{ fontSize: 11, color: task.projects.areaColor ?? '#888888', fontWeight: 600 }}>{task.projects.name}</span>
+                      <span style={{ fontSize: 11, color: task.projects.color, fontWeight: 600 }}>{task.projects.name}</span>
                     )}
                     <PriorityBadge priority={task.priority} />
                     <DeadlineBadge date={task.deadline} />

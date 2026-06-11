@@ -197,22 +197,20 @@ export default function AreasClient({ areas, userId }: { areas: AreaWithContent[
                     <>
                       <span style={labelStyle}><CheckSquare size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />Tasks</span>
                       {a.tasks.map(t => (
-                        <Link key={t.id} href={`/projects/${t.project_id}`} style={{ display: 'block', textDecoration: 'none', color: 'inherit', marginBottom: 4 }}>
-                          <div style={{
-                            display: 'flex', alignItems: 'center', gap: 10,
-                            padding: '8px 10px', borderRadius: 9,
-                            background: 'var(--surface)', border: '1px solid var(--border)',
-                            cursor: 'pointer',
-                            opacity: t.status === 'done' ? 0.55 : 1,
-                          }}>
-                            {statusIcon(t.status)}
-                            <div style={{ flex: 1 }}>
-                              <p style={{ fontSize: 13, fontWeight: 500, textDecoration: t.status === 'done' ? 'line-through' : 'none' }}>{t.title}</p>
-                            </div>
-                            <DeadlineBadge date={t.deadline} />
-                            <PriorityBadge priority={t.priority as never} />
+                        <div key={t.id} onClick={() => router.push(`/projects/${t.project_id}`)} style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '8px 10px', borderRadius: 9, marginBottom: 4,
+                          background: 'var(--surface)', border: '1px solid var(--border)',
+                          cursor: 'pointer',
+                          opacity: t.status === 'done' ? 0.55 : 1,
+                        }}>
+                          {statusIcon(t.status)}
+                          <div style={{ flex: 1 }}>
+                            <p style={{ fontSize: 13, fontWeight: 500, textDecoration: t.status === 'done' ? 'line-through' : 'none' }}>{t.title}</p>
                           </div>
-                        </Link>
+                          <DeadlineBadge date={t.deadline} />
+                          <PriorityBadge priority={t.priority as never} />
+                        </div>
                       ))}
                     </>
                   )}

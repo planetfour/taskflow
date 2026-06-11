@@ -65,7 +65,7 @@ export default function ProjectDetailClient({ project, tasks, allAreas, userId }
           </div>
           {total > 0 && (
             <div style={{ marginTop: 12, height: 4, background: 'var(--surface2)', borderRadius: 4 }}>
-              <div style={{ width: `${pct}%`, height: '100%', background: projectAreaColor, borderRadius: 4, transition: 'width 0.3s' }} />
+              <div style={{ width: `${pct}%`, height: '100%', background: project.color, borderRadius: 4, transition: 'width 0.3s' }} />
             </div>
           )}
         </div>
@@ -121,7 +121,7 @@ export default function ProjectDetailClient({ project, tasks, allAreas, userId }
         )}
 
         {filtered.map(task => (
-          <TaskItem key={task.id} task={task} allAreas={allAreas} projectColor={projectAreaColor} onRefresh={() => router.refresh()} userId={userId} />
+          <TaskItem key={task.id} task={task} allAreas={allAreas} onRefresh={() => router.refresh()} userId={userId} />
         ))}
       </div>
 

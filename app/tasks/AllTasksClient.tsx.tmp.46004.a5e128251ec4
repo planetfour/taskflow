@@ -126,7 +126,7 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
               background: 'var(--surface)', border: '1px solid var(--border)',
               borderRadius: 12, padding: '12px 14px', marginBottom: 8,
               opacity: done ? 0.6 : 1,
-              borderLeft: inProgress ? '3px solid var(--accent)' : `3px solid ${task.projects?.areaColor ?? '#888888'}`,
+              borderLeft: inProgress ? '3px solid var(--accent)' : `3px solid ${task.projects?.color ?? 'var(--border)'}`,
               cursor: 'pointer',
             }} onClick={() => setEditingTask(task)}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -145,7 +145,7 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
                   </p>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 5 }}>
                     {task.projects && (
-                      <span style={{ fontSize: 11, color: task.projects.areaColor ?? '#888888', fontWeight: 600 }}>{task.projects.name}</span>
+                      <span style={{ fontSize: 11, color: task.projects.color, fontWeight: 600 }}>{task.projects.name}</span>
                     )}
                     <PriorityBadge priority={task.priority} />
                     <DeadlineBadge date={task.deadline} />
