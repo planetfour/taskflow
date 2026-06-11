@@ -35,26 +35,31 @@ export default function ProjectModal({ project, allAreas, onClose, onSaved, user
   async function handleSave() {
     if (!name.trim()) { setError('Name is required'); return }
     setLoading(true); setError('')
+
     const payload = {
       name: name.trim(), description: description.trim() || null,
       color, priority, status, deadline: deadline || null, user_id: userId,
     }
-    let projectId = project?.id
+
+    // Save or update project, get back a definite string ID
+    let savedId: string
     if (project) {
-      const { error } = await supabase.from('projects').update(payload).eq('id', project.id)
-      if (error) { setError(error.message); setLoading(false); return }
+      const { error: updateError } = await supabase.from('projects').update(payload).eq('id', project.id)
+      if (updateError) { setError(updateError.message); setLoading(false); return }
+      savedId = project.id
     } else {
-      const { data, error } = await supabase.from('projects').insert(payload).select().single()
-      if (error) { setError(error.message); setLoading(false); return }
-      projectId = data.id
+      const { data, error: insertError } = await supabase.from('projects').insert(payload).select('id').single()
+      if (insertError || !data) { setError(insertError?.message ?? 'Failed to create project'); setLoading(false); return }
+      savedId = data.id
     }
 
-    // Update area associations
-    if (projectId) {
-      await supabase.from('project_areas').delete().eq('project_id', projectId)
-      if (selectedAreaIds.length > 0) {
-        await supabase.from('project_areas').insert(selectedAreaIds.map(area_id => ({ project_id: projectId, area_id })))
-      }
+    // Clear existing area associations then rewrite
+    await supabase.from('project_areas').delete().eq('project_id', savedId)
+
+    if (selectedAreaIds.length > 0) {
+      const rows = selectedAreaIds.map(area_id => ({ project_id: savedId, area_id }))
+      const { error: areaError } = await supabase.from('project_areas').insert(rows)
+      if (areaError) { setError(areaError.message); setLoading(false); return }
     }
 
     setLoading(false)
@@ -131,7 +136,7 @@ export default function ProjectModal({ project, allAreas, onClose, onSaved, user
             <AreaPicker allAreas={allAreas} selectedIds={selectedAreaIds} onChange={setSelectedAreaIds} userId={userId} onAreasChanged={onSaved} />
           </div>
 
-          {error && <p style={{ color: 'var(--red)', fontSize: 13 }}>{error}</p>}
+          {error && <p style={{ color: 'var(--red)', fontSize: 13, padding: '8px 12px', background: 'rgba(229,62,62,0.1)', borderRadius: 8 }}>{error}</p>}
 
           <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
             {project && (
