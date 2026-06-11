@@ -76,7 +76,7 @@ export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId 
           background: 'var(--surface)', border: '1px solid var(--border)',
           borderRadius: 12, padding: '12px 14px', marginBottom: 6,
           opacity: done ? 0.6 : 1, transition: 'opacity 0.15s',
-          borderLeft: inProgress ? '3px solid var(--accent)' : `3px solid ${areaColor}`,
+          borderLeft: `3px solid ${areaColor}`,
           cursor: 'pointer',
         }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
