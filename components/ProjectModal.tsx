@@ -5,8 +5,6 @@ import { Project, Priority, ProjectStatus, Area } from '@/lib/types'
 import { X } from 'lucide-react'
 import AreaPicker from './AreaPicker'
 
-const COLORS = ['#6c5ce7','#e53e3e','#38a169','#f97316','#3182ce','#d53f8c','#805ad5','#2b6cb0']
-
 interface Props {
   project?: Project
   allAreas: Area[]
@@ -23,11 +21,11 @@ const labelStyle: React.CSSProperties = {
 export default function ProjectModal({ project, allAreas, onClose, onSaved, userId }: Props) {
   const [name, setName] = useState(project?.name ?? '')
   const [description, setDescription] = useState(project?.description ?? '')
-  const [color, setColor] = useState(project?.color ?? '#6c5ce7')
   const [priority, setPriority] = useState<Priority>(project?.priority ?? 'medium')
   const [status, setStatus] = useState<ProjectStatus>(project?.status ?? 'active')
   const [deadline, setDeadline] = useState(project?.deadline ?? '')
   const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>((project?.areas ?? []).map(a => a.id))
+  const [localAreas, setLocalAreas] = useState<Area[]>(allAreas)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const supabase = createClient()
@@ -38,10 +36,9 @@ export default function ProjectModal({ project, allAreas, onClose, onSaved, user
 
     const payload = {
       name: name.trim(), description: description.trim() || null,
-      color, priority, status, deadline: deadline || null, user_id: userId,
+      color: '#888888', priority, status, deadline: deadline || null, user_id: userId,
     }
 
-    // Save or update project, get back a definite string ID
     let savedId: string
     if (project) {
       const { error: updateError } = await supabase.from('projects').update(payload).eq('id', project.id)
@@ -53,7 +50,6 @@ export default function ProjectModal({ project, allAreas, onClose, onSaved, user
       savedId = data.id
     }
 
-    // Clear existing area associations then rewrite
     await supabase.from('project_areas').delete().eq('project_id', savedId)
 
     if (selectedAreaIds.length > 0) {
@@ -95,18 +91,6 @@ export default function ProjectModal({ project, allAreas, onClose, onSaved, user
             <label style={labelStyle}>Description</label>
             <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional notes…" rows={2} style={{ width: '100%', resize: 'vertical' }} />
           </div>
-          <div>
-            <label style={labelStyle}>Color</label>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {COLORS.map(c => (
-                <button key={c} onClick={() => setColor(c)} style={{
-                  width: 28, height: 28, borderRadius: '50%', background: c,
-                  border: color === c ? '3px solid #fff' : '3px solid transparent',
-                  outline: color === c ? `2px solid ${c}` : 'none', cursor: 'pointer',
-                }} />
-              ))}
-            </div>
-          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={labelStyle}>Priority</label>
@@ -133,7 +117,14 @@ export default function ProjectModal({ project, allAreas, onClose, onSaved, user
           </div>
           <div>
             <label style={labelStyle}>Areas of Responsibility</label>
-            <AreaPicker allAreas={allAreas} selectedIds={selectedAreaIds} onChange={setSelectedAreaIds} userId={userId} onAreasChanged={onSaved} />
+            <AreaPicker
+              allAreas={localAreas}
+              selectedIds={selectedAreaIds}
+              onChange={setSelectedAreaIds}
+              userId={userId}
+              onAreaCreated={a => setLocalAreas(p => [...p, a])}
+              onAreaDeleted={id => setLocalAreas(p => p.filter(x => x.id !== id))}
+            />
           </div>
 
           {error && <p style={{ color: 'var(--red)', fontSize: 13, padding: '8px 12px', background: 'rgba(229,62,62,0.1)', borderRadius: 8 }}>{error}</p>}

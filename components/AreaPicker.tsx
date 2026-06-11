@@ -9,23 +9,20 @@ interface Props {
   selectedIds: string[]
   onChange: (ids: string[]) => void
   userId: string
-  onAreasChanged?: () => void
+  onAreaCreated?: (area: Area) => void
+  onAreaDeleted?: (id: string) => void
 }
 
 const COLORS = ['#6c5ce7','#e53e3e','#38a169','#f97316','#3182ce','#d53f8c','#805ad5','#0891b2']
 
-export default function AreaPicker({ allAreas, selectedIds, onChange, userId, onAreasChanged }: Props) {
+export default function AreaPicker({ allAreas, selectedIds, onChange, userId, onAreaCreated, onAreaDeleted }: Props) {
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newColor, setNewColor] = useState('#6c5ce7')
   const supabase = createClient()
 
   function toggle(id: string) {
-    if (selectedIds.includes(id)) {
-      onChange(selectedIds.filter(x => x !== id))
-    } else {
-      onChange([...selectedIds, id])
-    }
+    onChange(selectedIds.includes(id) ? selectedIds.filter(x => x !== id) : [...selectedIds, id])
   }
 
   async function createArea() {
@@ -33,9 +30,16 @@ export default function AreaPicker({ allAreas, selectedIds, onChange, userId, on
     const { data } = await supabase.from('areas').insert({ name: newName.trim(), color: newColor, user_id: userId }).select().single()
     if (data) {
       onChange([...selectedIds, data.id])
-      onAreasChanged?.()
+      onAreaCreated?.(data as Area)
     }
     setNewName(''); setCreating(false)
+  }
+
+  async function deleteArea(id: string) {
+    if (!confirm('Delete this area? It will be removed from all projects and tasks.')) return
+    await supabase.from('areas').delete().eq('id', id)
+    onChange(selectedIds.filter(x => x !== id))
+    onAreaDeleted?.(id)
   }
 
   return (
@@ -44,13 +48,22 @@ export default function AreaPicker({ allAreas, selectedIds, onChange, userId, on
         {allAreas.map(a => {
           const selected = selectedIds.includes(a.id)
           return (
-            <button key={a.id} onClick={() => toggle(a.id)} style={{
-              fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 6,
-              color: selected ? '#fff' : a.color,
-              background: selected ? a.color : `${a.color}22`,
-              border: `1px solid ${a.color}66`,
-              transition: 'all 0.15s',
-            }}>{a.name}</button>
+            <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <button onClick={() => toggle(a.id)} style={{
+                fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: '6px 0 0 6px',
+                color: selected ? '#fff' : a.color,
+                background: selected ? a.color : `${a.color}22`,
+                border: `1px solid ${a.color}66`,
+                transition: 'all 0.15s',
+              }}>{a.name}</button>
+              <button onClick={() => deleteArea(a.id)} style={{
+                fontSize: 10, padding: '4px 5px', borderRadius: '0 6px 6px 0',
+                color: selected ? '#fff' : a.color,
+                background: selected ? a.color : `${a.color}22`,
+                border: `1px solid ${a.color}66`, borderLeft: 'none',
+                opacity: 0.6,
+              }}><X size={10} /></button>
+            </div>
           )
         })}
         <button onClick={() => setCreating(!creating)} style={{

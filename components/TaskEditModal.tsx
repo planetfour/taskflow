@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Task, Priority, TaskStatus, Area, RecurrenceType } from '@/lib/types'
 import { X, RotateCcw } from 'lucide-react'
@@ -14,7 +14,6 @@ interface Props {
   userId: string
   onClose: () => void
   onSaved: () => void
-  onAreasChanged: () => void
 }
 
 const labelStyle: React.CSSProperties = {
@@ -22,7 +21,7 @@ const labelStyle: React.CSSProperties = {
   textTransform: 'uppercase', display: 'block', marginBottom: 6,
 }
 
-export default function TaskEditModal({ task, allAreas, userId, onClose, onSaved, onAreasChanged }: Props) {
+export default function TaskEditModal({ task, allAreas, userId, onClose, onSaved }: Props) {
   const [title, setTitle] = useState(task.title)
   const [notes, setNotes] = useState(task.notes ?? '')
   const [priority, setPriority] = useState<Priority>(task.priority)
@@ -31,6 +30,7 @@ export default function TaskEditModal({ task, allAreas, userId, onClose, onSaved
   const [recurrenceType, setRecurrenceType] = useState<RecurrenceType | null>(task.recurrence_type)
   const [recurrenceInterval, setRecurrenceInterval] = useState<number | null>(task.recurrence_interval)
   const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>((task.areas ?? []).map(a => a.id))
+  const [localAreas, setLocalAreas] = useState<Area[]>(allAreas)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const supabase = createClient()
@@ -43,7 +43,6 @@ export default function TaskEditModal({ task, allAreas, userId, onClose, onSaved
     const isNowDone = status === 'done'
     const completedAt = isNowDone && wasNotDone ? new Date().toISOString() : (status !== 'done' ? null : task.completed_at)
 
-    // If completing a recurring task, calculate next due
     let nextDue: string | null = null
     if (isNowDone && wasNotDone && recurrenceType) {
       nextDue = nextDueDate(recurrenceType, recurrenceInterval)
@@ -62,7 +61,6 @@ export default function TaskEditModal({ task, allAreas, userId, onClose, onSaved
     const { error: updateError } = await supabase.from('tasks').update(payload).eq('id', task.id)
     if (updateError) { setError(updateError.message); setLoading(false); return }
 
-    // If completing a recurring task, create next occurrence
     if (isNowDone && wasNotDone && recurrenceType) {
       await supabase.from('tasks').insert({
         title: task.title, notes: task.notes,
@@ -75,7 +73,6 @@ export default function TaskEditModal({ task, allAreas, userId, onClose, onSaved
       })
     }
 
-    // Update area associations
     await supabase.from('task_areas').delete().eq('task_id', task.id)
     if (selectedAreaIds.length > 0) {
       await supabase.from('task_areas').insert(selectedAreaIds.map(area_id => ({ task_id: task.id, area_id })))
@@ -165,11 +162,12 @@ export default function TaskEditModal({ task, allAreas, userId, onClose, onSaved
           <div>
             <label style={labelStyle}>Areas</label>
             <AreaPicker
-              allAreas={allAreas}
+              allAreas={localAreas}
               selectedIds={selectedAreaIds}
               onChange={setSelectedAreaIds}
               userId={userId}
-              onAreasChanged={onAreasChanged}
+              onAreaCreated={a => setLocalAreas(p => [...p, a])}
+              onAreaDeleted={id => setLocalAreas(p => p.filter(x => x.id !== id))}
             />
           </div>
 

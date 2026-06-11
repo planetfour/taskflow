@@ -27,6 +27,7 @@ export default function TaskModal({ projectId, userId, allAreas, onClose, onSave
   const [recurrenceType, setRecurrenceType] = useState<RecurrenceType | null>(null)
   const [recurrenceInterval, setRecurrenceInterval] = useState<number | null>(null)
   const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>([])
+  const [localAreas, setLocalAreas] = useState<Area[]>(allAreas)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const supabase = createClient()
@@ -97,7 +98,14 @@ export default function TaskModal({ projectId, userId, allAreas, onClose, onSave
           </div>
           <div>
             <label style={labelStyle}>Areas</label>
-            <AreaPicker allAreas={allAreas} selectedIds={selectedAreaIds} onChange={setSelectedAreaIds} userId={userId} />
+            <AreaPicker
+              allAreas={localAreas}
+              selectedIds={selectedAreaIds}
+              onChange={setSelectedAreaIds}
+              userId={userId}
+              onAreaCreated={a => setLocalAreas(p => [...p, a])}
+              onAreaDeleted={id => setLocalAreas(p => p.filter(x => x.id !== id))}
+            />
           </div>
 
           {error && <p style={{ color: 'var(--red)', fontSize: 13 }}>{error}</p>}

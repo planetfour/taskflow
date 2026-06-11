@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Task, Area, Priority, TaskStatus } from '@/lib/types'
+import { Task, Area, TaskStatus } from '@/lib/types'
 import Nav from '@/components/Nav'
 import PriorityBadge from '@/components/PriorityBadge'
 import DeadlineBadge from '@/components/DeadlineBadge'
@@ -11,7 +11,7 @@ import { createClient } from '@/lib/supabase/client'
 import { CheckSquare, Circle, CheckCircle2, PlayCircle, RotateCcw } from 'lucide-react'
 import { nextDueDate, formatCompletedAt } from '@/lib/utils'
 
-type TaskWithProject = Task & { projects: { name: string; color: string; areaColor?: string } }
+type TaskWithProject = Task & { projects: { name: string; color: string } }
 
 interface Props { tasks: TaskWithProject[]; allAreas: Area[]; userId: string }
 
@@ -121,12 +121,13 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
         {filtered.map(task => {
           const done = task.status === 'done'
           const inProgress = task.status === 'in_progress'
+          const areaColor = (task.areas ?? [])[0]?.color ?? '#888888'
           return (
             <div key={task.id} style={{
               background: 'var(--surface)', border: '1px solid var(--border)',
               borderRadius: 12, padding: '12px 14px', marginBottom: 8,
               opacity: done ? 0.6 : 1,
-              borderLeft: inProgress ? '3px solid var(--accent)' : `3px solid ${task.projects?.areaColor ?? '#888888'}`,
+              borderLeft: inProgress ? '3px solid var(--accent)' : `3px solid ${areaColor}`,
               cursor: 'pointer',
             }} onClick={() => setEditingTask(task)}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -145,7 +146,7 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
                   </p>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 5 }}>
                     {task.projects && (
-                      <span style={{ fontSize: 11, color: task.projects.areaColor ?? '#888888', fontWeight: 600 }}>{task.projects.name}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>{task.projects.name}</span>
                     )}
                     <PriorityBadge priority={task.priority} />
                     <DeadlineBadge date={task.deadline} />
@@ -166,7 +167,6 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
           task={editingTask} allAreas={allAreas} userId={userId}
           onClose={() => setEditingTask(null)}
           onSaved={() => { setEditingTask(null); router.refresh() }}
-          onAreasChanged={() => router.refresh()}
         />
       )}
       <Nav />

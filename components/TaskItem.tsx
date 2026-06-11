@@ -13,12 +13,11 @@ interface Props {
   task: Task
   allAreas: Area[]
   depth?: number
-  projectColor?: string
   onRefresh: () => void
   userId: string
 }
 
-export default function TaskItem({ task, allAreas, depth = 0, projectColor, onRefresh, userId }: Props) {
+export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [addingSubtask, setAddingSubtask] = useState(false)
   const [subtaskTitle, setSubtaskTitle] = useState('')
@@ -32,7 +31,6 @@ export default function TaskItem({ task, allAreas, depth = 0, projectColor, onRe
 
     await supabase.from('tasks').update({ status: next, completed_at: completedAt }).eq('id', task.id)
 
-    // If completing a recurring task, spawn next occurrence
     if (next === 'done' && task.recurrence_type) {
       const due = nextDueDate(task.recurrence_type, task.recurrence_interval)
       await supabase.from('tasks').insert({
@@ -61,6 +59,7 @@ export default function TaskItem({ task, allAreas, depth = 0, projectColor, onRe
 
   const done = task.status === 'done'
   const inProgress = task.status === 'in_progress'
+  const areaColor = (task.areas ?? [])[0]?.color ?? '#888888'
 
   return (
     <div style={{ marginLeft: depth > 0 ? 20 : 0 }}>
@@ -70,11 +69,10 @@ export default function TaskItem({ task, allAreas, depth = 0, projectColor, onRe
           background: 'var(--surface)', border: '1px solid var(--border)',
           borderRadius: 12, padding: '12px 14px', marginBottom: 6,
           opacity: done ? 0.6 : 1, transition: 'opacity 0.15s',
-          borderLeft: inProgress ? '3px solid var(--accent)' : projectColor ? `3px solid ${projectColor}` : undefined,
+          borderLeft: inProgress ? '3px solid var(--accent)' : `3px solid ${areaColor}`,
           cursor: 'pointer',
         }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-          {/* Status toggle */}
           <button onClick={e => { e.stopPropagation(); toggleStatus() }} style={{
             width: 20, height: 20, borderRadius: '50%', flexShrink: 0, marginTop: 2,
             border: `2px solid ${done ? 'var(--accent)' : inProgress ? 'var(--accent)' : 'var(--border)'}`,
@@ -132,7 +130,7 @@ export default function TaskItem({ task, allAreas, depth = 0, projectColor, onRe
       </div>
 
       {expanded && hasSubtasks && task.subtasks!.map(sub => (
-        <TaskItem key={sub.id} task={sub} allAreas={allAreas} depth={depth + 1} projectColor={projectColor} onRefresh={onRefresh} userId={userId} />
+        <TaskItem key={sub.id} task={sub} allAreas={allAreas} depth={depth + 1} onRefresh={onRefresh} userId={userId} />
       ))}
 
       {editing && (
@@ -140,7 +138,6 @@ export default function TaskItem({ task, allAreas, depth = 0, projectColor, onRe
           task={task} allAreas={allAreas} userId={userId}
           onClose={() => setEditing(false)}
           onSaved={() => { setEditing(false); onRefresh() }}
-          onAreasChanged={onRefresh}
         />
       )}
     </div>

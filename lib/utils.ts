@@ -46,9 +46,19 @@ export function recurrenceLabel(type: RecurrenceType | null, interval?: number |
     case 'weekly': return 'Weekly'
     case 'biweekly': return 'Every 2 weeks'
     case 'monthly': return 'Monthly'
-    case 'custom': return `Every ${interval ?? '?'} days`
+    case 'custom': {
+      const mask = interval ?? 0
+      if (!mask) return 'Custom'
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+      const bits = [1, 2, 4, 8, 16, 32, 64]
+      const names = days.filter((_, i) => mask & bits[i])
+      return names.join(', ')
+    }
   }
 }
+
+// dayBits maps JS getDay() (0=Sun...6=Sat) to bitmask values (Mon=1,Tue=2,Wed=4,Thu=8,Fri=16,Sat=32,Sun=64)
+const DAY_BITS = [64, 1, 2, 4, 8, 16, 32]
 
 export function nextDueDate(type: RecurrenceType, interval: number | null, fromDate?: Date): string {
   const base = fromDate ?? new Date()
@@ -58,7 +68,17 @@ export function nextDueDate(type: RecurrenceType, interval: number | null, fromD
     case 'weekly': d.setDate(d.getDate() + 7); break
     case 'biweekly': d.setDate(d.getDate() + 14); break
     case 'monthly': d.setMonth(d.getMonth() + 1); break
-    case 'custom': d.setDate(d.getDate() + (interval ?? 7)); break
+    case 'custom': {
+      const mask = interval ?? 31
+      for (let i = 1; i <= 7; i++) {
+        const candidate = new Date(base)
+        candidate.setDate(base.getDate() + i)
+        if (mask & DAY_BITS[candidate.getDay()]) {
+          return candidate.toISOString().split('T')[0]
+        }
+      }
+      d.setDate(d.getDate() + 7); break
+    }
   }
   return d.toISOString().split('T')[0]
 }
