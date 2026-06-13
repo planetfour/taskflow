@@ -13,17 +13,29 @@ export default async function TodayPage() {
   const today = new Date().toISOString().split('T')[0]
   const in7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-  const { data: tasks } = await supabase.from('tasks')
-    .select('*, projects(id, name, color)')
-    .eq('user_id', user.id)
-    .is('parent_task_id', null)
-    .neq('status', 'done')
-    .not('deadline', 'is', null)
-    .lte('deadline', in7Days)
-    .order('deadline', { ascending: true })
-    .order('priority')
+  const [{ data: tasks }, { data: recurringRaw }] = await Promise.all([
+    supabase.from('tasks')
+      .select('*, projects(id, name, color)')
+      .eq('user_id', user.id)
+      .is('parent_task_id', null)
+      .neq('status', 'done')
+      .not('deadline', 'is', null)
+      .lte('deadline', in7Days)
+      .order('deadline', { ascending: true })
+      .order('priority'),
+    supabase.from('tasks')
+      .select('*, projects(id, name, color)')
+      .eq('user_id', user.id)
+      .is('parent_task_id', null)
+      .neq('status', 'done')
+      .not('recurrence_type', 'is', null)
+      .or(`deadline.is.null,deadline.gt.${in7Days}`)
+      .order('recurrence_type')
+      .order('priority'),
+  ])
 
-  const taskIds = (tasks ?? []).map(t => t.id)
+  const allRaw = [...(tasks ?? []), ...(recurringRaw ?? [])]
+  const taskIds = allRaw.map(t => t.id)
 
   const [taskAreaResult, allAreasResult] = await Promise.all([
     taskIds.length > 0
@@ -38,14 +50,16 @@ export default async function TodayPage() {
     taskAreaMap[r.task_id].push(r.areas as Area)
   })
 
-  const tasksWithAreas = (tasks ?? []).map(t => ({
-    ...t,
-    areas: taskAreaMap[t.id] ?? [],
-  }))
+  type TaskWithProject = Task & { projects: { id: string; name: string; color: string } | null }
+
+  function withAreas(raw: typeof tasks): TaskWithProject[] {
+    return (raw ?? []).map(t => ({ ...t, areas: taskAreaMap[t.id] ?? [] })) as TaskWithProject[]
+  }
 
   return (
     <TodayClient
-      tasks={tasksWithAreas as (Task & { projects: { id: string; name: string; color: string } | null })[]}
+      tasks={withAreas(tasks)}
+      recurringTasks={withAreas(recurringRaw)}
       allAreas={allAreasResult.data ?? []}
       userId={user.id}
       today={today}

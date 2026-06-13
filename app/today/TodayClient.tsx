@@ -7,7 +7,7 @@ import DeadlineBadge from '@/components/DeadlineBadge'
 import TaskEditModal from '@/components/TaskEditModal'
 import { createClient } from '@/lib/supabase/client'
 import { CalendarDays, RotateCcw } from 'lucide-react'
-import { nextDueDate } from '@/lib/utils'
+import { nextDueDate, recurrenceLabel } from '@/lib/utils'
 
 const HOLD_COLOR = '#eab308'
 
@@ -15,12 +15,13 @@ type TaskWithProject = Task & { projects: { id: string; name: string; color: str
 
 interface Props {
   tasks: TaskWithProject[]
+  recurringTasks: TaskWithProject[]
   allAreas: Area[]
   userId: string
   today: string
 }
 
-export default function TodayClient({ tasks, allAreas, userId, today }: Props) {
+export default function TodayClient({ tasks, recurringTasks, allAreas, userId, today }: Props) {
   const [editingTask, setEditingTask] = useState<TaskWithProject | null>(null)
   const [localStatuses, setLocalStatuses] = useState<Record<string, TaskStatus>>({})
   const router = useRouter()
@@ -34,6 +35,7 @@ export default function TodayClient({ tasks, allAreas, userId, today }: Props) {
   const overdue = activeTasks.filter(t => t.deadline! < today)
   const todayTasks = activeTasks.filter(t => t.deadline === today)
   const upcoming = activeTasks.filter(t => t.deadline! > today)
+  const activeRecurring = recurringTasks.filter(t => effectiveStatus(t) !== 'done')
 
   const upcomingByDate: Record<string, TaskWithProject[]> = {}
   upcoming.forEach(t => {
@@ -68,11 +70,12 @@ export default function TodayClient({ tasks, allAreas, userId, today }: Props) {
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
   }
 
-  function renderTask(task: TaskWithProject) {
+  function renderTask(task: TaskWithProject, showRecurrenceLabel = false) {
     const status = effectiveStatus(task)
     const done = status === 'done'
     const holding = status === 'holding'
     const proj = task.projects
+    const recurLabel = showRecurrenceLabel ? recurrenceLabel(task.recurrence_type, task.recurrence_interval) : null
     return (
       <div key={task.id} onClick={() => setEditingTask(task)} style={{
         background: 'var(--surface)', border: '1px solid var(--border)',
@@ -110,6 +113,9 @@ export default function TodayClient({ tasks, allAreas, userId, today }: Props) {
                   {proj.name}
                 </span>
               )}
+              {recurLabel && (
+                <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 500 }}>{recurLabel}</span>
+              )}
               <DeadlineBadge date={task.deadline} />
             </div>
           </div>
@@ -133,7 +139,7 @@ export default function TodayClient({ tasks, allAreas, userId, today }: Props) {
     )
   }
 
-  const isEmpty = overdue.length === 0 && todayTasks.length === 0 && upcoming.length === 0
+  const isEmpty = overdue.length === 0 && todayTasks.length === 0 && upcoming.length === 0 && activeRecurring.length === 0
 
   return (
     <div style={{ minHeight: '100vh', paddingBottom: 80 }}>
@@ -184,6 +190,13 @@ export default function TodayClient({ tasks, allAreas, userId, today }: Props) {
                 {upcomingByDate[date].map(t => renderTask(t))}
               </div>
             ))}
+          </div>
+        )}
+
+        {activeRecurring.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            <SectionHeader label="Recurring" count={activeRecurring.length} color="#6c5ce7" />
+            {activeRecurring.map(t => renderTask(t, true))}
           </div>
         )}
       </div>
