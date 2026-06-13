@@ -5,8 +5,9 @@ import { Task, Area, TaskStatus } from '@/lib/types'
 import Nav from '@/components/Nav'
 import DeadlineBadge from '@/components/DeadlineBadge'
 import TaskEditModal from '@/components/TaskEditModal'
+import SnoozeModal from '@/components/SnoozeModal'
 import { createClient } from '@/lib/supabase/client'
-import { CalendarDays, RotateCcw } from 'lucide-react'
+import { CalendarDays, RotateCcw, AlarmClock } from 'lucide-react'
 import { nextDueDate, recurrenceLabel } from '@/lib/utils'
 
 const HOLD_COLOR = '#eab308'
@@ -23,6 +24,7 @@ interface Props {
 
 export default function TodayClient({ tasks, recurringTasks, allAreas, userId, today }: Props) {
   const [editingTask, setEditingTask] = useState<TaskWithProject | null>(null)
+  const [snoozingTask, setSnoozingTask] = useState<TaskWithProject | null>(null)
   const [localStatuses, setLocalStatuses] = useState<Record<string, TaskStatus>>({})
   const router = useRouter()
   const supabase = createClient()
@@ -59,6 +61,13 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
         deadline: due, recurrence_type: task.recurrence_type, recurrence_interval: task.recurrence_interval,
       })
     }
+    startTransition(() => router.refresh())
+  }
+
+  async function snoozeTask(date: string) {
+    if (!snoozingTask) return
+    await supabase.from('tasks').update({ deadline: date }).eq('id', snoozingTask.id)
+    setSnoozingTask(null)
     startTransition(() => router.refresh())
   }
 
@@ -119,6 +128,13 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
               <DeadlineBadge date={task.deadline} />
             </div>
           </div>
+          <button
+            onClick={e => { e.stopPropagation(); setSnoozingTask(task) }}
+            style={{ flexShrink: 0, padding: 4, background: 'none', color: 'var(--text-dim)', marginTop: 1 }}
+            title="Snooze"
+          >
+            <AlarmClock size={15} />
+          </button>
         </div>
       </div>
     )
@@ -208,6 +224,13 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
           userId={userId}
           onClose={() => setEditingTask(null)}
           onSaved={() => { setEditingTask(null); startTransition(() => router.refresh()) }}
+        />
+      )}
+      {snoozingTask && (
+        <SnoozeModal
+          task={snoozingTask}
+          onSnooze={snoozeTask}
+          onClose={() => setSnoozingTask(null)}
         />
       )}
       <Nav />

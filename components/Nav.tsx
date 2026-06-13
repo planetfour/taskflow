@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutGrid, CheckSquare, Tag, LogOut, CalendarDays } from 'lucide-react'
+import { LayoutGrid, CheckSquare, Tag, LogOut, CalendarDays, BarChart2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
@@ -18,8 +18,9 @@ export default function Nav() {
   const tabs = [
     { href: '/', label: 'Projects', icon: LayoutGrid },
     { href: '/today', label: 'Today', icon: CalendarDays },
-    { href: '/tasks', label: 'All Tasks', icon: CheckSquare },
+    { href: '/tasks', label: 'Tasks', icon: CheckSquare },
     { href: '/areas', label: 'Areas', icon: Tag },
+    { href: '/insights', label: 'Stats', icon: BarChart2 },
   ]
 
   return (
@@ -35,7 +36,7 @@ export default function Nav() {
         return (
           <Link key={href} href={href} style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
-            gap: 3, padding: '4px 20px', textDecoration: 'none',
+            gap: 3, padding: '4px 10px', textDecoration: 'none',
             color: active ? 'var(--accent)' : 'var(--text-muted)',
             transition: 'color 0.15s',
           }}>
@@ -46,7 +47,7 @@ export default function Nav() {
       })}
       <button onClick={signOut} style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        gap: 3, padding: '4px 20px', background: 'none',
+        gap: 3, padding: '4px 10px', background: 'none',
         color: 'var(--text-muted)',
       }}>
         <LogOut size={22} />
