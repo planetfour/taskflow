@@ -66,12 +66,10 @@ export function recurrenceLabel(type: RecurrenceType | null, interval?: number |
 const DAY_BITS = [64, 1, 2, 4, 8, 16, 32]
 
 export function effectiveDueDate(task: { deadline: string | null; recurrence_type: RecurrenceType | null; recurrence_interval: number | null }): string | null {
-  const today = toLocalDate(new Date())
-  if (task.recurrence_type) {
-    if (!task.deadline || task.deadline >= today) return today
-    return task.deadline // past-due recurring task
-  }
-  return task.deadline
+  if (task.recurrence_type === 'daily') return toLocalDate(new Date())
+  if (task.deadline) return task.deadline
+  if (task.recurrence_type) return nextDueDate(task.recurrence_type, task.recurrence_interval)
+  return null
 }
 
 export function nextDueDate(type: RecurrenceType, interval: number | null, fromDate?: Date): string {
