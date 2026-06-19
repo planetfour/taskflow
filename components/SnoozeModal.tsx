@@ -13,19 +13,23 @@ const WEEKDAYS = [
   { name: 'Sun', jsDay: 0, bit: 64 },
 ]
 
+function toLocalDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function nextOccurrenceOf(jsDay: number): string {
   const d = new Date()
   const current = d.getDay()
   let diff = jsDay - current
   if (diff <= 0) diff += 7
   d.setDate(d.getDate() + diff)
-  return d.toISOString().split('T')[0]
+  return toLocalDate(d)
 }
 
 function addDays(n: number): string {
   const d = new Date()
   d.setDate(d.getDate() + n)
-  return d.toISOString().split('T')[0]
+  return toLocalDate(d)
 }
 
 function formatShort(dateStr: string): string {
@@ -45,7 +49,7 @@ const labelStyle: React.CSSProperties = {
 
 export default function SnoozeModal({ task, onSnooze, onClose }: Props) {
   const [customDate, setCustomDate] = useState('')
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = toLocalDate(new Date())
   const isRecurring = !!task.recurrence_type
   const mask = task.recurrence_interval ?? 0
 

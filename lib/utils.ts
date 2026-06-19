@@ -1,5 +1,9 @@
 import { Priority, RecurrenceType } from './types'
 
+export function toLocalDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function priorityColor(priority: Priority): string {
   switch (priority) {
     case 'urgent': return '#ef4444'
@@ -18,11 +22,12 @@ export function formatDeadline(date: string | null): string | null {
   const d = new Date(date + 'T00:00:00')
   const now = new Date()
   const diff = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-  if (diff < 0) return `${Math.abs(diff)}d overdue`
+  const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  if (diff < 0) return `${dateStr} · ${Math.abs(diff)}d late`
   if (diff === 0) return 'Due today'
-  if (diff === 1) return 'Due tomorrow'
-  if (diff <= 7) return `${diff}d left`
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  if (diff === 1) return `${dateStr} · tomorrow`
+  if (diff <= 7) return `${dateStr} · ${diff}d`
+  return dateStr
 }
 
 export function deadlineUrgency(date: string | null): 'overdue' | 'soon' | 'ok' | null {
@@ -61,9 +66,12 @@ export function recurrenceLabel(type: RecurrenceType | null, interval?: number |
 const DAY_BITS = [64, 1, 2, 4, 8, 16, 32]
 
 export function effectiveDueDate(task: { deadline: string | null; recurrence_type: RecurrenceType | null; recurrence_interval: number | null }): string | null {
-  if (task.deadline) return task.deadline
-  if (task.recurrence_type) return nextDueDate(task.recurrence_type, task.recurrence_interval)
-  return null
+  const today = toLocalDate(new Date())
+  if (task.recurrence_type) {
+    if (!task.deadline || task.deadline >= today) return today
+    return task.deadline // past-due recurring task
+  }
+  return task.deadline
 }
 
 export function nextDueDate(type: RecurrenceType, interval: number | null, fromDate?: Date): string {
@@ -80,11 +88,11 @@ export function nextDueDate(type: RecurrenceType, interval: number | null, fromD
         const candidate = new Date(base)
         candidate.setDate(base.getDate() + i)
         if (mask & DAY_BITS[candidate.getDay()]) {
-          return candidate.toISOString().split('T')[0]
+          return toLocalDate(candidate)
         }
       }
       d.setDate(d.getDate() + 7); break
     }
   }
-  return d.toISOString().split('T')[0]
+  return toLocalDate(d)
 }
