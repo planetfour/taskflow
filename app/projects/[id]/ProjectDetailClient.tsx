@@ -10,6 +10,7 @@ import PriorityBadge from '@/components/PriorityBadge'
 import DeadlineBadge from '@/components/DeadlineBadge'
 import AreaTag from '@/components/AreaTag'
 import { ArrowLeft, Plus, Settings, Circle, Clock, CheckCircle2 } from 'lucide-react'
+import { effectiveDueDate } from '@/lib/utils'
 
 interface Props { project: Project; tasks: Task[]; allAreas: Area[]; userId: string }
 
@@ -27,6 +28,17 @@ export default function ProjectDetailClient({ project, tasks, allAreas, userId }
     if (filterAreaIds.size > 0 && !(t.areas ?? []).some(a => filterAreaIds.has(a.id))) return false
     return true
   })
+
+  const sortedFiltered = [...filtered].sort((a, b) => {
+    const da = effectiveDueDate(a)
+    const db = effectiveDueDate(b)
+    if (!da && !db) return 0
+    if (!da) return 1
+    if (!db) return -1
+    return da.localeCompare(db)
+  })
+  const datedTasks = sortedFiltered.filter(t => effectiveDueDate(t) !== null)
+  const undatedTasks = sortedFiltered.filter(t => effectiveDueDate(t) === null)
 
   const total = rootTasks.length
   const done = rootTasks.filter(t => t.status === 'done').length
@@ -157,9 +169,22 @@ export default function ProjectDetailClient({ project, tasks, allAreas, userId }
           </div>
         )}
 
-        {filtered.map(task => (
+        {datedTasks.map(task => (
           <TaskItem key={task.id} task={task} allAreas={allAreas} onRefresh={() => startTransition(() => router.refresh())} userId={userId} />
         ))}
+
+        {undatedTasks.length > 0 && (
+          <>
+            {datedTasks.length > 0 && (
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '14px 0 8px', paddingLeft: 2 }}>
+                No date
+              </div>
+            )}
+            {undatedTasks.map(task => (
+              <TaskItem key={task.id} task={task} allAreas={allAreas} onRefresh={() => startTransition(() => router.refresh())} userId={userId} />
+            ))}
+          </>
+        )}
       </div>
 
       {showTaskModal && (

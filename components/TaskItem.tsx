@@ -6,8 +6,9 @@ import PriorityBadge from './PriorityBadge'
 import DeadlineBadge from './DeadlineBadge'
 import AreaTag from './AreaTag'
 import TaskEditModal from './TaskEditModal'
-import { ChevronRight, Plus, RotateCcw } from 'lucide-react'
-import { nextDueDate, formatCompletedAt } from '@/lib/utils'
+import { ChevronRight, Plus, RotateCcw, AlarmClock } from 'lucide-react'
+import { nextDueDate, formatCompletedAt, effectiveDueDate } from '@/lib/utils'
+import SnoozeModal from './SnoozeModal'
 
 const HOLD_COLOR = '#eab308'
 
@@ -25,6 +26,7 @@ export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId 
   const [addingSubtask, setAddingSubtask] = useState(false)
   const [subtaskTitle, setSubtaskTitle] = useState('')
   const [editing, setEditing] = useState(false)
+  const [snoozing, setSnoozing] = useState(false)
   const supabase = createClient()
   const hasSubtasks = task.subtasks && task.subtasks.length > 0
 
@@ -65,9 +67,16 @@ export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId 
     startTransition(() => onRefresh())
   }
 
+  async function handleSnooze(date: string) {
+    await supabase.from('tasks').update({ deadline: date }).eq('id', task.id)
+    setSnoozing(false)
+    startTransition(() => onRefresh())
+  }
+
   const done = localStatus === 'done'
   const holding = localStatus === 'holding'
   const areaColor = (task.areas ?? [])[0]?.color ?? '#888888'
+  const dueDate = effectiveDueDate(task)
 
   return (
     <div style={{ marginLeft: depth > 0 ? 20 : 0 }}>
@@ -103,7 +112,7 @@ export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId 
             </p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
               <PriorityBadge priority={task.priority} />
-              <DeadlineBadge date={task.deadline} />
+              <DeadlineBadge date={dueDate} />
               {done && task.completed_at && (
                 <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Done {formatCompletedAt(task.completed_at)}</span>
               )}
@@ -123,6 +132,9 @@ export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId 
                 transform: expanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s',
               }}><ChevronRight size={15} /></button>
             )}
+            <button onClick={() => setSnoozing(true)} style={{
+              background: 'none', color: 'var(--text-dim)', padding: 4, borderRadius: 6, display: 'flex',
+            }} title="Snooze"><AlarmClock size={15} /></button>
           </div>
         </div>
 
@@ -151,6 +163,13 @@ export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId 
           task={task} allAreas={allAreas} userId={userId}
           onClose={() => setEditing(false)}
           onSaved={() => { setEditing(false); startTransition(() => onRefresh()) }}
+        />
+      )}
+      {snoozing && (
+        <SnoozeModal
+          task={task}
+          onSnooze={handleSnooze}
+          onClose={() => setSnoozing(false)}
         />
       )}
     </div>

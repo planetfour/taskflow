@@ -106,7 +106,7 @@ export default function TaskEditModal({ task, allAreas, userId, onClose, onSaved
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label style={labelStyle}>Title</label>
-            <input value={title} onChange={e => setTitle(e.target.value)} style={{ width: '100%' }} />
+            <input value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleSave() }} style={{ width: '100%' }} />
           </div>
 
           <div>

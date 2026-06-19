@@ -85,7 +85,7 @@ export default function ProjectModal({ project, allAreas, onClose, onSaved, user
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <label style={labelStyle}>Project name</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Website redesign" style={{ width: '100%' }} />
+            <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleSave() }} placeholder="e.g. Website redesign" style={{ width: '100%' }} />
           </div>
           <div>
             <label style={labelStyle}>Description</label>
