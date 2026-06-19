@@ -55,11 +55,15 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
     await supabase.from('tasks').update({ status: next, completed_at: completedAt }).eq('id', task.id)
     if (next === 'done' && task.recurrence_type) {
       const due = nextDueDate(task.recurrence_type, task.recurrence_interval)
-      await supabase.from('tasks').insert({
+      const { data: newTask } = await supabase.from('tasks').insert({
         title: task.title, notes: task.notes, priority: task.priority, status: 'todo',
         project_id: task.project_id, user_id: userId, parent_task_id: null,
         deadline: due, recurrence_type: task.recurrence_type, recurrence_interval: task.recurrence_interval,
-      })
+      }).select('id').single()
+      const areaIds = (task.areas ?? []).map(a => a.id)
+      if (newTask && areaIds.length > 0) {
+        await supabase.from('task_areas').insert(areaIds.map(area_id => ({ task_id: newTask.id, area_id })))
+      }
     }
     startTransition(() => router.refresh())
   }

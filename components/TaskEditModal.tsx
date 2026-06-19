@@ -62,7 +62,7 @@ export default function TaskEditModal({ task, allAreas, userId, onClose, onSaved
     if (updateError) { setError(updateError.message); setLoading(false); return }
 
     if (isNowDone && wasNotDone && recurrenceType) {
-      await supabase.from('tasks').insert({
+      const { data: newTask } = await supabase.from('tasks').insert({
         title: task.title, notes: task.notes,
         priority: task.priority, status: 'todo',
         project_id: task.project_id, user_id: userId,
@@ -70,7 +70,11 @@ export default function TaskEditModal({ task, allAreas, userId, onClose, onSaved
         deadline: nextDue,
         recurrence_type: recurrenceType,
         recurrence_interval: recurrenceInterval,
-      })
+      }).select('id').single()
+      const areaIds = (task.areas ?? []).map(a => a.id)
+      if (newTask && areaIds.length > 0) {
+        await supabase.from('task_areas').insert(areaIds.map(area_id => ({ task_id: newTask.id, area_id })))
+      }
     }
 
     await supabase.from('task_areas').delete().eq('task_id', task.id)
