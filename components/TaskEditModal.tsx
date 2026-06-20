@@ -130,7 +130,15 @@ export default function TaskEditModal({ task, allAreas, userId, onClose, onSaved
             </div>
             <div>
               <label style={labelStyle}>Status</label>
-              <select value={status} onChange={e => setStatus(e.target.value as TaskStatus)} style={{ width: '100%' }}>
+              <select value={status} onChange={e => {
+                const newStatus = e.target.value as TaskStatus
+                setStatus(newStatus)
+                if (newStatus === 'holding') {
+                  setDeadline('')
+                } else if (newStatus === 'todo' && status === 'holding' && recurrenceType) {
+                  setDeadline(nextDueDate(recurrenceType, recurrenceInterval))
+                }
+              }} style={{ width: '100%' }}>
                 <option value="todo">To do</option>
                 <option value="holding">Holding</option>
                 <option value="done">Done</option>

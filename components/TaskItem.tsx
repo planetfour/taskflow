@@ -38,7 +38,14 @@ export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId 
 
     setLocalStatus(next)
 
-    await supabase.from('tasks').update({ status: next, completed_at: completedAt }).eq('id', task.id)
+    let deadlineUpdate: { deadline?: string | null } = {}
+    if (next === 'holding') {
+      deadlineUpdate = { deadline: null }
+    } else if (next === 'todo' && localStatus === 'holding' && task.recurrence_type) {
+      deadlineUpdate = { deadline: nextDueDate(task.recurrence_type, task.recurrence_interval) }
+    }
+
+    await supabase.from('tasks').update({ status: next, completed_at: completedAt, ...deadlineUpdate }).eq('id', task.id)
 
     if (next === 'done' && task.recurrence_type) {
       const due = nextDueDate(task.recurrence_type, task.recurrence_interval)

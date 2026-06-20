@@ -52,7 +52,15 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
     const next: TaskStatus = current === 'done' ? 'todo' : current === 'todo' ? 'holding' : 'done'
     const completedAt = next === 'done' ? new Date().toISOString() : null
     setLocalStatuses(prev => ({ ...prev, [task.id]: next }))
-    await supabase.from('tasks').update({ status: next, completed_at: completedAt }).eq('id', task.id)
+
+    let deadlineUpdate: { deadline?: string | null } = {}
+    if (next === 'holding') {
+      deadlineUpdate = { deadline: null }
+    } else if (next === 'todo' && current === 'holding' && task.recurrence_type) {
+      deadlineUpdate = { deadline: nextDueDate(task.recurrence_type, task.recurrence_interval) }
+    }
+
+    await supabase.from('tasks').update({ status: next, completed_at: completedAt, ...deadlineUpdate }).eq('id', task.id)
     if (next === 'done' && task.recurrence_type) {
       const due = nextDueDate(task.recurrence_type, task.recurrence_interval)
       const { data: newTask } = await supabase.from('tasks').insert({
