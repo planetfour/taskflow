@@ -87,7 +87,7 @@ export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId 
   const done = localStatus === 'done'
   const holding = localStatus === 'holding'
   const areaColor = (task.areas ?? [])[0]?.color ?? '#888888'
-  const dueDate = effectiveDueDate(task)
+  const dueDate = holding ? null : effectiveDueDate(task)
 
   return (
     <div style={{ marginLeft: depth > 0 ? 20 : 0 }}>

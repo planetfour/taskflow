@@ -65,7 +65,8 @@ export function recurrenceLabel(type: RecurrenceType | null, interval?: number |
 // dayBits maps JS getDay() (0=Sun...6=Sat) to bitmask values (Mon=1,Tue=2,Wed=4,Thu=8,Fri=16,Sat=32,Sun=64)
 const DAY_BITS = [64, 1, 2, 4, 8, 16, 32]
 
-export function effectiveDueDate(task: { deadline: string | null; recurrence_type: RecurrenceType | null; recurrence_interval: number | null }): string | null {
+export function effectiveDueDate(task: { deadline: string | null; recurrence_type: RecurrenceType | null; recurrence_interval: number | null; status?: string }): string | null {
+  if (task.status === 'holding') return null
   if (task.recurrence_type === 'daily') return toLocalDate(new Date())
   if (task.deadline) return task.deadline
   if (task.recurrence_type) return nextDueDate(task.recurrence_type, task.recurrence_interval)
