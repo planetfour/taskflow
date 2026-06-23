@@ -10,9 +10,10 @@ export default async function ProjectsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [{ data: projects }, { data: areas }] = await Promise.all([
+  const [{ data: projects }, { data: areas }, { data: allTasks }] = await Promise.all([
     supabase.from('projects').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
     supabase.from('areas').select('*').eq('user_id', user.id).order('name'),
+    supabase.from('tasks').select('project_id, status').eq('user_id', user.id),
   ])
 
   const projectIds = (projects ?? []).map(p => p.id)
@@ -21,11 +22,7 @@ export default async function ProjectsPage() {
     return <ProjectsClient projects={[]} allAreas={areas ?? []} userId={user.id} />
   }
 
-  // 2 bulk queries instead of N×3 per-project queries
-  const [{ data: allTasks }, { data: paRows }] = await Promise.all([
-    supabase.from('tasks').select('project_id, status').eq('user_id', user.id),
-    supabase.from('project_areas').select('project_id, areas(*)').in('project_id', projectIds),
-  ])
+  const { data: paRows } = await supabase.from('project_areas').select('project_id, areas(*)').in('project_id', projectIds)
 
   const taskCounts: Record<string, { total: number; done: number }> = {}
   ;(allTasks ?? []).forEach((t: { project_id: string; status: string }) => {

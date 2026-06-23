@@ -25,14 +25,13 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: project } = await supabase.from('projects').select('*').eq('id', id).eq('user_id', user.id).single()
-  if (!project) redirect('/')
-
-  const [{ data: projectAreaRows }, { data: tasks }, { data: allAreas }] = await Promise.all([
+  const [{ data: project }, { data: projectAreaRows }, { data: tasks }, { data: allAreas }] = await Promise.all([
+    supabase.from('projects').select('*').eq('id', id).eq('user_id', user.id).single(),
     supabase.from('project_areas').select('areas(*)').eq('project_id', id),
     supabase.from('tasks').select('*').eq('project_id', id).eq('user_id', user.id).order('sort_order').order('created_at'),
     supabase.from('areas').select('*').eq('user_id', user.id).order('name'),
   ])
+  if (!project) redirect('/')
 
   const projectAreas = (projectAreaRows ?? []).map((r: { areas: unknown }) => r.areas).flat() as Area[]
 

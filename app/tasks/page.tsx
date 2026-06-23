@@ -10,22 +10,22 @@ export default async function AllTasksPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: tasks } = await supabase.from('tasks')
-    .select('*, projects(name, color)')
-    .eq('user_id', user.id)
-    .is('parent_task_id', null)
-    .order('status')
-    .order('deadline', { ascending: true, nullsFirst: false })
-    .order('created_at', { ascending: false })
+  const [{ data: tasks }, allAreasResult] = await Promise.all([
+    supabase.from('tasks')
+      .select('*, projects(name, color)')
+      .eq('user_id', user.id)
+      .is('parent_task_id', null)
+      .order('status')
+      .order('deadline', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: false }),
+    supabase.from('areas').select('*').eq('user_id', user.id).order('name'),
+  ])
 
   const taskIds = (tasks ?? []).map(t => t.id)
 
-  const [taskAreaResult, allAreasResult] = await Promise.all([
-    taskIds.length > 0
-      ? supabase.from('task_areas').select('task_id, areas(*)').in('task_id', taskIds)
-      : Promise.resolve({ data: null }),
-    supabase.from('areas').select('*').eq('user_id', user.id).order('name'),
-  ])
+  const taskAreaResult = taskIds.length > 0
+    ? await supabase.from('task_areas').select('task_id, areas(*)').in('task_id', taskIds)
+    : { data: null }
 
   const taskAreaMap: Record<string, Area[]> = {}
   ;((taskAreaResult.data ?? []) as { task_id: string; areas: unknown }[]).forEach(r => {
