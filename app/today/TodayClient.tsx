@@ -37,7 +37,8 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
   const overdue = activeTasks.filter(t => t.deadline! < today)
   const todayTasks = activeTasks.filter(t => t.deadline === today)
   const upcoming = activeTasks.filter(t => t.deadline! > today)
-  const activeRecurring = recurringTasks.filter(t => effectiveStatus(t) !== 'done')
+  const activeRecurring = recurringTasks.filter(t => effectiveStatus(t) !== 'done' && t.deadline !== null)
+  const recurringDueNow = recurringTasks.filter(t => effectiveStatus(t) !== 'done' && t.deadline === null)
 
   const upcomingByDate: Record<string, TaskWithProject[]> = {}
   upcoming.forEach(t => {
@@ -167,7 +168,7 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
     )
   }
 
-  const isEmpty = overdue.length === 0 && todayTasks.length === 0 && upcoming.length === 0 && activeRecurring.length === 0
+  const isEmpty = overdue.length === 0 && todayTasks.length === 0 && recurringDueNow.length === 0 && upcoming.length === 0 && activeRecurring.length === 0
 
   return (
     <div style={{ minHeight: '100vh', paddingBottom: 80 }}>
@@ -196,10 +197,11 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
           </div>
         )}
 
-        {todayTasks.length > 0 && (
+        {(todayTasks.length > 0 || recurringDueNow.length > 0) && (
           <div style={{ marginBottom: 24 }}>
-            <SectionHeader label="Today" count={todayTasks.length} color="var(--accent)" />
+            <SectionHeader label="Today" count={todayTasks.length + recurringDueNow.length} color="var(--accent)" />
             {todayTasks.map(t => renderTask(t))}
+            {recurringDueNow.map(t => renderTask(t, true))}
           </div>
         )}
 
