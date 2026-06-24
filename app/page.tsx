@@ -35,7 +35,12 @@ export default async function ProjectsPage() {
   const projectAreasMap: Record<string, Area[]> = {}
   ;((paRows ?? []) as { project_id: string; areas: unknown }[]).forEach(r => {
     if (!projectAreasMap[r.project_id]) projectAreasMap[r.project_id] = []
-    if (r.areas) projectAreasMap[r.project_id].push(r.areas as Area)
+    const areaVal = r.areas
+    if (Array.isArray(areaVal)) {
+      areaVal.filter(Boolean).forEach(a => projectAreasMap[r.project_id].push(a as Area))
+    } else if (areaVal) {
+      projectAreasMap[r.project_id].push(areaVal as Area)
+    }
   })
 
   const projectsWithData = (projects ?? []).map(p => ({

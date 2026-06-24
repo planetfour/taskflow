@@ -13,7 +13,7 @@ export default async function TodayPage() {
   const today = new Date().toISOString().split('T')[0]
   const in7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-  const [{ data: tasks }, { data: recurringRaw }, allAreasResult] = await Promise.all([
+  const [{ data: tasks }, { data: recurringRaw }, allAreasResult, { data: allProjects }] = await Promise.all([
     supabase.from('tasks')
       .select('*, projects(id, name, color)')
       .eq('user_id', user.id)
@@ -33,23 +33,24 @@ export default async function TodayPage() {
       .order('recurrence_type')
       .order('priority'),
     supabase.from('areas').select('*').eq('user_id', user.id).order('name'),
+    supabase.from('projects').select('id').eq('user_id', user.id),
   ])
 
-  const projectIds = [
-    ...new Set([
-      ...(tasks ?? []).map((t: any) => t.project_id),
-      ...(recurringRaw ?? []).map((t: any) => t.project_id),
-    ].filter(Boolean))
-  ]
+  const allProjectIds = (allProjects ?? []).map((p: any) => p.id)
 
-  const { data: paRows } = projectIds.length
-    ? await supabase.from('project_areas').select('project_id, areas(*)').in('project_id', projectIds)
+  const { data: paRows } = allProjectIds.length
+    ? await supabase.from('project_areas').select('project_id, areas(*)').in('project_id', allProjectIds)
     : { data: [] }
 
   const projectAreasMap: Record<string, Area[]> = {}
   ;((paRows ?? []) as { project_id: string; areas: unknown }[]).forEach(r => {
     if (!projectAreasMap[r.project_id]) projectAreasMap[r.project_id] = []
-    if (r.areas) projectAreasMap[r.project_id].push(r.areas as Area)
+    const areaVal = r.areas
+    if (Array.isArray(areaVal)) {
+      areaVal.filter(Boolean).forEach(a => projectAreasMap[r.project_id].push(a as Area))
+    } else if (areaVal) {
+      projectAreasMap[r.project_id].push(areaVal as Area)
+    }
   })
 
   type TaskWithProject = Task & { projects: { id: string; name: string; color: string } | null }

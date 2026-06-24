@@ -1,7 +1,7 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Task, Priority, TaskStatus, RecurrenceType } from '@/lib/types'
+import { Task, Area, Priority, TaskStatus, RecurrenceType } from '@/lib/types'
 import { X, RotateCcw } from 'lucide-react'
 import PriorityBadge from './PriorityBadge'
 import RecurrencePicker from './RecurrencePicker'
@@ -10,6 +10,7 @@ import { formatCompletedAt, recurrenceLabel, nextDueDate } from '@/lib/utils'
 interface Props {
   task: Task
   userId: string
+  allAreas?: Area[]
   onClose: () => void
   onSaved: () => void
 }
@@ -25,11 +26,18 @@ export default function TaskEditModal({ task, userId, onClose, onSaved }: Props)
   const [priority, setPriority] = useState<Priority>(task.priority)
   const [status, setStatus] = useState<TaskStatus>(task.status)
   const [deadline, setDeadline] = useState(task.deadline ?? '')
+  const [projectId, setProjectId] = useState<string>(task.project_id ?? '')
   const [recurrenceType, setRecurrenceType] = useState<RecurrenceType | null>(task.recurrence_type)
   const [recurrenceInterval, setRecurrenceInterval] = useState<number | null>(task.recurrence_interval)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [projects, setProjects] = useState<{ id: string; name: string; color: string }[]>([])
   const supabase = createClient()
+
+  useEffect(() => {
+    supabase.from('projects').select('id, name, color').eq('user_id', userId).eq('status', 'active').order('name')
+      .then(({ data }) => { if (data) setProjects(data) })
+  }, [userId])
 
   async function handleSave() {
     if (!title.trim()) { setError('Title is required'); return }
@@ -44,7 +52,7 @@ export default function TaskEditModal({ task, userId, onClose, onSaved }: Props)
       nextDue = nextDueDate(recurrenceType, recurrenceInterval)
     }
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       title: title.trim(),
       notes: notes.trim() || null,
       priority, status, deadline: deadline || null,
@@ -52,6 +60,9 @@ export default function TaskEditModal({ task, userId, onClose, onSaved }: Props)
       recurrence_type: recurrenceType,
       recurrence_interval: recurrenceInterval,
       recurrence_next_due: nextDue ?? (recurrenceType && deadline ? deadline : null),
+    }
+    if (projectId && projectId !== task.project_id) {
+      payload.project_id = projectId
     }
 
     const { error: updateError } = await supabase.from('tasks').update(payload).eq('id', task.id)
@@ -61,7 +72,7 @@ export default function TaskEditModal({ task, userId, onClose, onSaved }: Props)
       await supabase.from('tasks').insert({
         title: task.title, notes: task.notes,
         priority: task.priority, status: 'todo',
-        project_id: task.project_id, user_id: userId,
+        project_id: projectId || task.project_id, user_id: userId,
         parent_task_id: task.parent_task_id,
         deadline: nextDue,
         recurrence_type: recurrenceType,
@@ -103,6 +114,15 @@ export default function TaskEditModal({ task, userId, onClose, onSaved }: Props)
           <div>
             <label style={labelStyle}>Notes</label>
             <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} style={{ width: '100%', resize: 'vertical' }} />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Project</label>
+            <select value={projectId} onChange={e => setProjectId(e.target.value)} style={{ width: '100%' }}>
+              {projects.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
