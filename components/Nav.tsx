@@ -37,22 +37,22 @@ export default function Nav() {
         return (
           <Link key={href} href={href} style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
-            gap: 3, padding: '4px 10px', textDecoration: 'none',
+            gap: 2, padding: '4px 6px', textDecoration: 'none',
             color: active ? 'var(--accent)' : 'var(--text-muted)',
-            transition: 'color 0.15s',
+            transition: 'color 0.15s', flex: 1,
           }}>
-            <Icon size={22} />
-            <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{label}</span>
+            <Icon size={20} />
+            <span style={{ fontSize: 9, fontWeight: 500, letterSpacing: '0.03em', textTransform: 'uppercase' }}>{label}</span>
           </Link>
         )
       })}
       <button onClick={signOut} style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        gap: 3, padding: '4px 10px', background: 'none',
-        color: 'var(--text-muted)',
+        gap: 2, padding: '4px 6px', background: 'none',
+        color: 'var(--text-muted)', flex: 1,
       }}>
-        <LogOut size={22} />
-        <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Out</span>
+        <LogOut size={20} />
+        <span style={{ fontSize: 9, fontWeight: 500, letterSpacing: '0.03em', textTransform: 'uppercase' }}>Out</span>
       </button>
     </nav>
   )
