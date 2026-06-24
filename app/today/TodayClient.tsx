@@ -59,37 +59,38 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
   }
 
   function groupByAreaThenProject(taskList: TaskWithProject[]): AreaGroup[] {
-    const areaMap = new Map<string | null, Map<string | null, TaskWithProject[]>>()
-    for (const task of taskList) {
-      const areaKey = getTaskArea(task)?.id ?? null
-      const projKey = task.projects?.id ?? null
-      if (!areaMap.has(areaKey)) areaMap.set(areaKey, new Map())
-      const projMap = areaMap.get(areaKey)!
-      if (!projMap.has(projKey)) projMap.set(projKey, [])
-      projMap.get(projKey)!.push(task)
+    const groups: AreaGroup[] = []
+
+    for (const area of allAreas) {
+      const areaTasks = taskList.filter(t => (t.areas ?? [])[0]?.id === area.id)
+      if (!areaTasks.length) continue
+      const projMap = new Map<string | null, TaskWithProject[]>()
+      for (const task of areaTasks) {
+        const key = task.projects?.id ?? null
+        if (!projMap.has(key)) projMap.set(key, [])
+        projMap.get(key)!.push(task)
+      }
+      groups.push({
+        area,
+        projects: [...projMap.values()].map(ptasks => ({ project: ptasks[0].projects, tasks: ptasks })),
+      })
     }
 
-    const areaIds = [...areaMap.keys()]
-    const sortedAreaIds = [
-      ...areaIds
-        .filter((k): k is string => k !== null)
-        .sort((a, b) => {
-          const aName = allAreas.find(ar => ar.id === a)?.name ?? ''
-          const bName = allAreas.find(ar => ar.id === b)?.name ?? ''
-          return aName.localeCompare(bName)
-        }),
-      null as string | null,
-    ].filter(k => areaMap.has(k))
+    const noAreaTasks = taskList.filter(t => (t.areas ?? []).length === 0)
+    if (noAreaTasks.length) {
+      const projMap = new Map<string | null, TaskWithProject[]>()
+      for (const task of noAreaTasks) {
+        const key = task.projects?.id ?? null
+        if (!projMap.has(key)) projMap.set(key, [])
+        projMap.get(key)!.push(task)
+      }
+      groups.push({
+        area: null,
+        projects: [...projMap.values()].map(ptasks => ({ project: ptasks[0].projects, tasks: ptasks })),
+      })
+    }
 
-    return sortedAreaIds.map(areaId => {
-      const area = areaId ? (allAreas.find(a => a.id === areaId) ?? null) : null
-      const projMap = areaMap.get(areaId)!
-      const projects = [...projMap.entries()].map(([, ptasks]) => ({
-        project: ptasks[0].projects,
-        tasks: ptasks,
-      }))
-      return { area, projects }
-    })
+    return groups
   }
 
   function toggleGroup(key: string) {
@@ -219,7 +220,7 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
     return groups.map(({ area, projects }) => {
       const groupKey = `${sectionKey}-${area?.id ?? 'none'}`
       const isCollapsed = !!collapsedGroups[groupKey]
-      const groupColor = area?.color ?? 'var(--text-dim)'
+      const groupColor = area?.color ?? '#888888'
       const totalCount = projects.reduce((n, p) => n + p.tasks.length, 0)
       return (
         <div key={groupKey} style={{ marginBottom: 8 }}>

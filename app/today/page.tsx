@@ -15,7 +15,7 @@ export default async function TodayPage() {
 
   const [{ data: tasks }, { data: recurringRaw }, allAreasResult] = await Promise.all([
     supabase.from('tasks')
-      .select('*, projects(id, name, color, project_areas(areas(*)))')
+      .select('*, projects(id, name, color)')
       .eq('user_id', user.id)
       .is('parent_task_id', null)
       .neq('status', 'done')
@@ -24,7 +24,7 @@ export default async function TodayPage() {
       .order('deadline', { ascending: true })
       .order('priority'),
     supabase.from('tasks')
-      .select('*, projects(id, name, color, project_areas(areas(*)))')
+      .select('*, projects(id, name, color)')
       .eq('user_id', user.id)
       .is('parent_task_id', null)
       .neq('status', 'done')
@@ -35,14 +35,29 @@ export default async function TodayPage() {
     supabase.from('areas').select('*').eq('user_id', user.id).order('name'),
   ])
 
+  const projectIds = [
+    ...new Set([
+      ...(tasks ?? []).map((t: any) => t.project_id),
+      ...(recurringRaw ?? []).map((t: any) => t.project_id),
+    ].filter(Boolean))
+  ]
+
+  const { data: paRows } = projectIds.length
+    ? await supabase.from('project_areas').select('project_id, areas(*)').in('project_id', projectIds)
+    : { data: [] }
+
+  const projectAreasMap: Record<string, Area[]> = {}
+  ;((paRows ?? []) as { project_id: string; areas: unknown }[]).forEach(r => {
+    if (!projectAreasMap[r.project_id]) projectAreasMap[r.project_id] = []
+    if (r.areas) projectAreasMap[r.project_id].push(r.areas as Area)
+  })
+
   type TaskWithProject = Task & { projects: { id: string; name: string; color: string } | null }
 
   function withAreas(raw: typeof tasks): TaskWithProject[] {
     return (raw ?? []).map(t => ({
       ...t,
-      areas: ((t.projects as any)?.project_areas ?? [])
-        .map((pa: { areas: unknown }) => pa.areas as Area)
-        .filter(Boolean),
+      areas: projectAreasMap[(t as any).project_id] ?? [],
     })) as TaskWithProject[]
   }
 
