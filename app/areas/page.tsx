@@ -9,15 +9,40 @@ export default async function AreasPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: areas } = await supabase.from('areas').select('*').eq('user_id', user.id).order('name')
+  // Step 1: fetch areas and all projects in parallel
+  const [{ data: areas }, { data: allProjects }] = await Promise.all([
+    supabase.from('areas').select('*').eq('user_id', user.id).order('name'),
+    supabase.from('projects').select('id, name, color, status, priority').eq('user_id', user.id),
+  ])
 
   const areaIds = (areas ?? []).map(a => a.id)
+  const allProjectIds = (allProjects ?? []).map(p => p.id)
 
-  const { data: allProjectRows } = areaIds.length > 0
-    ? await supabase.from('project_areas')
-        .select('area_id, projects(id, name, color, status, priority, tasks(id, title, status, priority, deadline, project_id))')
-        .in('area_id', areaIds)
-    : { data: [] as { area_id: string; projects: unknown }[] }
+  // Step 2: fetch area-content rows and project_areas membership in parallel
+  const [{ data: allProjectRows }, { data: paRows }] = await Promise.all([
+    areaIds.length > 0
+      ? supabase.from('project_areas')
+          .select('area_id, projects(id, name, color, status, priority, tasks(id, title, status, priority, deadline, project_id))')
+          .in('area_id', areaIds)
+      : Promise.resolve({ data: [] as any[] }),
+    allProjectIds.length > 0
+      ? supabase.from('project_areas').select('project_id').in('project_id', allProjectIds)
+      : Promise.resolve({ data: [] as any[] }),
+  ])
+
+  // Step 3: compute no-area projects
+  const projectIdsWithArea = new Set((paRows ?? []).map((r: any) => r.project_id))
+  const noAreaProjects = (allProjects ?? []).filter(p => !projectIdsWithArea.has(p.id))
+  const noAreaProjectIds = noAreaProjects.map(p => p.id)
+
+  // Step 4: fetch tasks for no-area projects
+  const { data: noAreaTasks } = noAreaProjectIds.length > 0
+    ? await supabase.from('tasks')
+        .select('id, title, status, priority, deadline, project_id')
+        .in('project_id', noAreaProjectIds)
+        .is('parent_task_id', null)
+        .neq('status', 'done')
+    : Promise.resolve({ data: [] as any[] })
 
   const areaProjectsMap: Record<string, unknown[]> = {}
   const areaTasksMap: Record<string, unknown[]> = {}
@@ -39,5 +64,12 @@ export default async function AreasPage() {
     task_count: (areaTasksMap[a.id] ?? []).length,
   }))
 
-  return <AreasClient areas={areasWithContent as never} userId={user.id} />
+  return (
+    <AreasClient
+      areas={areasWithContent as never}
+      userId={user.id}
+      noAreaProjects={noAreaProjects as never}
+      noAreaTasks={(noAreaTasks ?? []) as never}
+    />
+  )
 }

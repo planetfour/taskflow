@@ -47,7 +47,8 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
   const filtered = tasks.filter(t => {
     const status = effectiveStatus(t)
     if (filterStatuses.size > 0 && !filterStatuses.has(status)) return false
-    if (filterAreaIds.size > 0 && !(t.areas ?? []).some(a => filterAreaIds.has(a.id))) return false
+    const tAreas = t.areas ?? []
+    if (filterAreaIds.size > 0 && tAreas.length > 0 && !tAreas.some(a => filterAreaIds.has(a.id))) return false
     if (filterCompletedDate && t.completed_at) {
       if (t.completed_at.split('T')[0] !== filterCompletedDate) return false
     } else if (filterCompletedDate && !t.completed_at) {

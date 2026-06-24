@@ -49,7 +49,8 @@ export default function ProjectsClient({ projects, allAreas, userId }: Props) {
 
   const filteredProjects = projects.filter(p => {
     if (filterStatuses.size > 0 && !filterStatuses.has(p.status)) return false
-    if (filterAreaIds.size > 0 && !(p.areas ?? []).some(a => filterAreaIds.has(a.id))) return false
+    const pAreas = p.areas ?? []
+    if (filterAreaIds.size > 0 && pAreas.length > 0 && !pAreas.some(a => filterAreaIds.has(a.id))) return false
     return true
   })
 

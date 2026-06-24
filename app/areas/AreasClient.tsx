@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Tag, Plus, Pencil, Trash2, ChevronRight, Circle, CheckCircle2, Clock, LayoutGrid, CheckSquare } from 'lucide-react'
 
 const HOLD_COLOR = '#eab308'
+const NO_AREA_COLOR = '#888888'
 const COLORS = ['#6c5ce7','#e53e3e','#38a169','#f97316','#3182ce','#d53f8c','#805ad5','#0891b2']
 
 type ProjectSnippet = { id: string; name: string; color: string; status: string; priority: string }
@@ -22,7 +23,14 @@ const statusIcon = (s: string) => {
   return <Circle size={13} color="var(--text-dim)" />
 }
 
-export default function AreasClient({ areas, userId }: { areas: AreaWithContent[]; userId: string }) {
+interface AreasClientProps {
+  areas: AreaWithContent[]
+  userId: string
+  noAreaProjects?: ProjectSnippet[]
+  noAreaTasks?: TaskSnippet[]
+}
+
+export default function AreasClient({ areas, userId, noAreaProjects = [], noAreaTasks = [] }: AreasClientProps) {
   const [showNew, setShowNew] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -60,6 +68,9 @@ export default function AreasClient({ areas, userId }: { areas: AreaWithContent[
     fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.06em',
     textTransform: 'uppercase', marginBottom: 8, marginTop: 14, display: 'block',
   }
+
+  const hasNoAreaContent = noAreaProjects.length > 0 || noAreaTasks.length > 0
+  const noAreaExpanded = expandedId === '__none__'
 
   return (
     <div style={{ minHeight: '100vh', paddingBottom: 80 }}>
@@ -103,7 +114,7 @@ export default function AreasClient({ areas, userId }: { areas: AreaWithContent[
       )}
 
       <div style={{ padding: '0 16px' }}>
-        {areas.length === 0 && !showNew && (
+        {areas.length === 0 && !hasNoAreaContent && !showNew && (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
             <p style={{ fontSize: 15, marginBottom: 8 }}>No areas yet</p>
             <p style={{ fontSize: 13, color: 'var(--text-dim)' }}>Create areas to tag projects and tasks by life domain</p>
@@ -122,7 +133,6 @@ export default function AreasClient({ areas, userId }: { areas: AreaWithContent[
               borderLeft: `3px solid ${a.color}`,
               overflow: 'hidden',
             }}>
-              {/* Header row */}
               <div style={{ padding: '14px 16px' }}>
                 {isEditing ? (
                   <div>
@@ -168,7 +178,6 @@ export default function AreasClient({ areas, userId }: { areas: AreaWithContent[
                 )}
               </div>
 
-              {/* Expanded content */}
               {isExpanded && !isEditing && (
                 <div style={{ borderTop: '1px solid var(--border)', background: 'var(--surface2)', padding: '12px 16px' }}>
                   {a.projects.length > 0 && (
@@ -222,6 +231,82 @@ export default function AreasClient({ areas, userId }: { areas: AreaWithContent[
             </div>
           )
         })}
+
+        {hasNoAreaContent && (
+          <div style={{
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 14, marginBottom: 10,
+            borderLeft: `3px solid ${NO_AREA_COLOR}`,
+            overflow: 'hidden',
+          }}>
+            <div style={{ padding: '14px 16px' }}>
+              <div style={{ cursor: 'pointer', flex: 1 }} onClick={() => toggleExpand('__none__')}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: NO_AREA_COLOR, display: 'inline-block', flexShrink: 0 }} />
+                  <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-muted)' }}>No Area</span>
+                  <ChevronRight size={15} color="var(--text-dim)" style={{
+                    transform: noAreaExpanded ? 'rotate(90deg)' : 'none',
+                    transition: 'transform 0.15s',
+                  }} />
+                </div>
+                <p style={{ fontSize: 12, color: 'var(--text-dim)', paddingLeft: 18 }}>
+                  {noAreaProjects.length} project{noAreaProjects.length !== 1 ? 's' : ''} · {noAreaTasks.length} task{noAreaTasks.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+
+            {noAreaExpanded && (
+              <div style={{ borderTop: '1px solid var(--border)', background: 'var(--surface2)', padding: '12px 16px' }}>
+                {noAreaProjects.length > 0 && (
+                  <>
+                    <span style={labelStyle}><LayoutGrid size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />Projects</span>
+                    {noAreaProjects.map(p => (
+                      <Link key={p.id} href={`/projects/${p.id}`} style={{ display: 'block', textDecoration: 'none', color: 'inherit', marginBottom: 4 }}>
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '8px 10px', borderRadius: 9,
+                          background: 'var(--surface)', border: '1px solid var(--border)',
+                          cursor: 'pointer', borderLeft: `3px solid ${NO_AREA_COLOR}`,
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <p style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</p>
+                            <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2, textTransform: 'capitalize' }}>{p.status}</p>
+                          </div>
+                          <PriorityBadge priority={p.priority as never} />
+                          <ChevronRight size={13} color="var(--text-dim)" />
+                        </div>
+                      </Link>
+                    ))}
+                  </>
+                )}
+
+                {noAreaTasks.length > 0 && (
+                  <>
+                    <span style={labelStyle}><CheckSquare size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />Tasks</span>
+                    {noAreaTasks.map(t => (
+                      <Link key={t.id} href={`/projects/${t.project_id}`} style={{ display: 'block', textDecoration: 'none', color: 'inherit', marginBottom: 4 }}>
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '8px 10px', borderRadius: 9,
+                          background: 'var(--surface)', border: '1px solid var(--border)',
+                          cursor: 'pointer',
+                          opacity: t.status === 'done' ? 0.55 : 1,
+                        }}>
+                          {statusIcon(t.status)}
+                          <div style={{ flex: 1 }}>
+                            <p style={{ fontSize: 13, fontWeight: 500, textDecoration: t.status === 'done' ? 'line-through' : 'none' }}>{t.title}</p>
+                          </div>
+                          <DeadlineBadge date={t.deadline} />
+                          <PriorityBadge priority={t.priority as never} />
+                        </div>
+                      </Link>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
       <Nav />
     </div>
