@@ -1,6 +1,5 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import Nav from '@/components/Nav'
@@ -33,7 +32,7 @@ const statusIcon = (s: string) => {
   return <Circle size={13} color="var(--text-dim)" />
 }
 
-export default function SearchClient() {
+export default function SearchClient({ userId }: { userId: string }) {
   const [query, setQuery] = useState('')
   const [tasks, setTasks] = useState<TaskResult[]>([])
   const [projects, setProjects] = useState<ProjectResult[]>([])
@@ -58,12 +57,14 @@ export default function SearchClient() {
         supabase
           .from('tasks')
           .select('id, title, status, priority, deadline, project_id, projects(id, name, color)')
+          .eq('user_id', userId)
           .ilike('title', pattern)
           .is('parent_task_id', null)
           .limit(25),
         supabase
           .from('projects')
           .select('id, name, color, status, priority')
+          .eq('user_id', userId)
           .ilike('name', pattern)
           .limit(15),
       ])
