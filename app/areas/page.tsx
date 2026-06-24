@@ -42,7 +42,7 @@ export default async function AreasPage() {
         .in('project_id', noAreaProjectIds)
         .is('parent_task_id', null)
         .neq('status', 'done')
-    : Promise.resolve({ data: [] as any[] })
+    : { data: [] as any[] }
 
   const areaProjectsMap: Record<string, unknown[]> = {}
   const areaTasksMap: Record<string, unknown[]> = {}
