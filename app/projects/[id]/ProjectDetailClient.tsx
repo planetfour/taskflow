@@ -17,7 +17,7 @@ interface Props { project: Project; tasks: Task[]; allAreas: Area[]; userId: str
 export default function ProjectDetailClient({ project, tasks, allAreas, userId }: Props) {
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [showProjectModal, setShowProjectModal] = useState(false)
-  const [filterStatuses, setFilterStatuses] = useState<Set<TaskStatus>>(new Set())
+  const [filterStatuses, setFilterStatuses] = useState<Set<TaskStatus>>(new Set(['todo', 'holding']))
   const [filterAreaIds, setFilterAreaIds] = useState<Set<string>>(new Set())
   const router = useRouter()
 

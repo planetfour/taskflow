@@ -22,7 +22,7 @@ const PRIORITY_LABELS: Record<Priority, string> = { urgent: 'Urgent', high: 'Hig
 interface Props { tasks: TaskWithProject[]; allAreas: Area[]; userId: string }
 
 export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
-  const [filterStatuses, setFilterStatuses] = useState<Set<TaskStatus>>(new Set())
+  const [filterStatuses, setFilterStatuses] = useState<Set<TaskStatus>>(new Set(['todo', 'holding']))
   const [filterAreaIds, setFilterAreaIds] = useState<Set<string>>(new Set())
   const [filterCompletedDate, setFilterCompletedDate] = useState('')
   const [editingTask, setEditingTask] = useState<TaskWithProject | null>(null)

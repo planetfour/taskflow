@@ -17,7 +17,7 @@ interface Props { projects: Project[]; allAreas: Area[]; userId: string }
 
 export default function ProjectsClient({ projects, allAreas, userId }: Props) {
   const [showModal, setShowModal] = useState(false)
-  const [filterStatuses, setFilterStatuses] = useState<Set<ProjectStatus>>(new Set())
+  const [filterStatuses, setFilterStatuses] = useState<Set<ProjectStatus>>(new Set(['active', 'paused']))
   const [filterAreaIds, setFilterAreaIds] = useState<Set<string>>(new Set())
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const router = useRouter()
