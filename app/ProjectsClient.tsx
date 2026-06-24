@@ -58,7 +58,7 @@ export default function ProjectsClient({ projects, allAreas, userId }: Props) {
     ...allAreas.map(area => ({
       id: area.id, name: area.name, color: area.color,
       projects: filteredProjects.filter(p => (p.areas ?? [])[0]?.id === area.id),
-    })),
+    })).sort((a, b) => b.projects.length - a.projects.length),
     {
       id: '__none__', name: 'No Area', color: '#888888',
       projects: filteredProjects.filter(p => (p.areas ?? []).length === 0),
