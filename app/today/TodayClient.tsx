@@ -7,12 +7,17 @@ import DeadlineBadge from '@/components/DeadlineBadge'
 import TaskEditModal from '@/components/TaskEditModal'
 import SnoozeModal from '@/components/SnoozeModal'
 import { createClient } from '@/lib/supabase/client'
-import { CalendarDays, RotateCcw, AlarmClock } from 'lucide-react'
+import { CalendarDays, RotateCcw, AlarmClock, ChevronDown, ChevronRight } from 'lucide-react'
 import { nextDueDate, recurrenceLabel } from '@/lib/utils'
 
 const HOLD_COLOR = '#eab308'
 
 type TaskWithProject = Task & { projects: { id: string; name: string; color: string } | null }
+
+type AreaGroup = {
+  area: Area | null
+  projects: { project: { id: string; name: string; color: string } | null; tasks: TaskWithProject[] }[]
+}
 
 interface Props {
   tasks: TaskWithProject[]
@@ -26,6 +31,7 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
   const [editingTask, setEditingTask] = useState<TaskWithProject | null>(null)
   const [snoozingTask, setSnoozingTask] = useState<TaskWithProject | null>(null)
   const [localStatuses, setLocalStatuses] = useState<Record<string, TaskStatus>>({})
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
   const router = useRouter()
   const supabase = createClient()
 
@@ -48,6 +54,48 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
   })
   const upcomingDates = Object.keys(upcomingByDate).sort()
 
+  function getTaskArea(task: TaskWithProject): Area | null {
+    return task.areas?.[0] ?? null
+  }
+
+  function groupByAreaThenProject(taskList: TaskWithProject[]): AreaGroup[] {
+    const areaMap = new Map<string | null, Map<string | null, TaskWithProject[]>>()
+    for (const task of taskList) {
+      const areaKey = getTaskArea(task)?.id ?? null
+      const projKey = task.projects?.id ?? null
+      if (!areaMap.has(areaKey)) areaMap.set(areaKey, new Map())
+      const projMap = areaMap.get(areaKey)!
+      if (!projMap.has(projKey)) projMap.set(projKey, [])
+      projMap.get(projKey)!.push(task)
+    }
+
+    const areaIds = [...areaMap.keys()]
+    const sortedAreaIds = [
+      ...areaIds
+        .filter((k): k is string => k !== null)
+        .sort((a, b) => {
+          const aName = allAreas.find(ar => ar.id === a)?.name ?? ''
+          const bName = allAreas.find(ar => ar.id === b)?.name ?? ''
+          return aName.localeCompare(bName)
+        }),
+      null as string | null,
+    ].filter(k => areaMap.has(k))
+
+    return sortedAreaIds.map(areaId => {
+      const area = areaId ? (allAreas.find(a => a.id === areaId) ?? null) : null
+      const projMap = areaMap.get(areaId)!
+      const projects = [...projMap.entries()].map(([, ptasks]) => ({
+        project: ptasks[0].projects,
+        tasks: ptasks,
+      }))
+      return { area, projects }
+    })
+  }
+
+  function toggleGroup(key: string) {
+    setCollapsedGroups(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
   async function toggleStatus(task: TaskWithProject) {
     const current = effectiveStatus(task)
     const next: TaskStatus = current === 'done' ? 'todo' : current === 'todo' ? 'holding' : 'done'
@@ -64,11 +112,11 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
     await supabase.from('tasks').update({ status: next, completed_at: completedAt, ...deadlineUpdate }).eq('id', task.id)
     if (next === 'done' && task.recurrence_type) {
       const due = nextDueDate(task.recurrence_type, task.recurrence_interval)
-      const { data: newTask } = await supabase.from('tasks').insert({
+      await supabase.from('tasks').insert({
         title: task.title, notes: task.notes, priority: task.priority, status: 'todo',
         project_id: task.project_id, user_id: userId, parent_task_id: null,
         deadline: due, recurrence_type: task.recurrence_type, recurrence_interval: task.recurrence_interval,
-      }).select('id').single()
+      })
     }
     startTransition(() => router.refresh())
   }
@@ -93,13 +141,15 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
     const done = status === 'done'
     const holding = status === 'holding'
     const proj = task.projects
+    const area = getTaskArea(task)
     const recurLabel = showRecurrenceLabel ? recurrenceLabel(task.recurrence_type, task.recurrence_interval) : null
+    const borderColor = area?.color ?? proj?.color ?? 'var(--border)'
     return (
       <div key={task.id} onClick={() => setEditingTask(task)} style={{
         background: 'var(--surface)', border: '1px solid var(--border)',
         borderRadius: 12, padding: '11px 13px', marginBottom: 6,
         opacity: done ? 0.5 : 1,
-        borderLeft: proj ? `3px solid ${proj.color}` : '3px solid var(--border)',
+        borderLeft: `3px solid ${borderColor}`,
         cursor: 'pointer',
       }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -164,6 +214,57 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
     )
   }
 
+  function renderGrouped(taskList: TaskWithProject[], sectionKey: string, showRecurrenceLabel = false) {
+    const groups = groupByAreaThenProject(taskList)
+    return groups.map(({ area, projects }) => {
+      const groupKey = `${sectionKey}-${area?.id ?? 'none'}`
+      const isCollapsed = !!collapsedGroups[groupKey]
+      const groupColor = area?.color ?? 'var(--text-dim)'
+      const totalCount = projects.reduce((n, p) => n + p.tasks.length, 0)
+      return (
+        <div key={groupKey} style={{ marginBottom: 8 }}>
+          <button
+            onClick={() => toggleGroup(groupKey)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'none', padding: '3px 0', marginBottom: isCollapsed ? 0 : 5,
+              width: '100%', textAlign: 'left', cursor: 'pointer',
+            }}
+          >
+            {isCollapsed
+              ? <ChevronRight size={13} style={{ color: groupColor, flexShrink: 0 }} />
+              : <ChevronDown size={13} style={{ color: groupColor, flexShrink: 0 }} />
+            }
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: groupColor, flexShrink: 0 }} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: groupColor, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+              {area?.name ?? 'No Area'}
+            </span>
+            <span style={{ fontSize: 10, color: groupColor, opacity: 0.6, fontWeight: 600 }}>
+              {totalCount}
+            </span>
+          </button>
+          {!isCollapsed && projects.map(({ project, tasks: ptasks }) => (
+            <div key={project?.id ?? 'no-project'} style={{ marginBottom: 6 }}>
+              {projects.length > 1 && (
+                <div style={{
+                  fontSize: 10, fontWeight: 600,
+                  color: project?.color ?? 'var(--text-dim)',
+                  letterSpacing: '0.04em', textTransform: 'uppercase',
+                  paddingLeft: 19, marginBottom: 3,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: project?.color ?? 'var(--text-dim)', flexShrink: 0 }} />
+                  {project?.name ?? 'No Project'}
+                </div>
+              )}
+              {ptasks.map(t => renderTask(t, showRecurrenceLabel))}
+            </div>
+          ))}
+        </div>
+      )
+    })
+  }
+
   const isEmpty = overdue.length === 0 && todayTasks.length === 0 && recurringDueNow.length === 0 && upcoming.length === 0 && activeRecurring.length === 0
 
   return (
@@ -189,15 +290,14 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
         {overdue.length > 0 && (
           <div style={{ marginBottom: 24 }}>
             <SectionHeader label="Overdue" count={overdue.length} color="#ef4444" />
-            {overdue.map(t => renderTask(t))}
+            {renderGrouped(overdue, 'overdue')}
           </div>
         )}
 
         {(todayTasks.length > 0 || recurringDueNow.length > 0) && (
           <div style={{ marginBottom: 24 }}>
             <SectionHeader label="Today" count={todayTasks.length + recurringDueNow.length} color="var(--accent)" />
-            {todayTasks.map(t => renderTask(t))}
-            {recurringDueNow.map(t => renderTask(t, true))}
+            {renderGrouped([...todayTasks, ...recurringDueNow], 'today', true)}
           </div>
         )}
 
@@ -213,7 +313,7 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
                 }}>
                   {formatDateLabel(date)}
                 </div>
-                {upcomingByDate[date].map(t => renderTask(t))}
+                {renderGrouped(upcomingByDate[date], `upcoming-${date}`)}
               </div>
             ))}
           </div>
@@ -222,7 +322,7 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
         {activeRecurring.length > 0 && (
           <div style={{ marginBottom: 24 }}>
             <SectionHeader label="Recurring" count={activeRecurring.length} color="#6c5ce7" />
-            {activeRecurring.map(t => renderTask(t, true))}
+            {renderGrouped(activeRecurring, 'recurring', true)}
           </div>
         )}
       </div>
