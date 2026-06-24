@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutGrid, CheckSquare, Tag, LogOut, CalendarDays, BarChart2 } from 'lucide-react'
+import { LayoutGrid, CheckSquare, Tag, LogOut, CalendarDays, BarChart2, Search } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
@@ -20,6 +20,7 @@ export default function Nav() {
     { href: '/today', label: 'Today', icon: CalendarDays },
     { href: '/tasks', label: 'Tasks', icon: CheckSquare },
     { href: '/areas', label: 'Areas', icon: Tag },
+    { href: '/search', label: 'Search', icon: Search },
     { href: '/insights', label: 'Stats', icon: BarChart2 },
   ]
 
