@@ -68,8 +68,8 @@ export default function SearchClient({ userId }: { userId: string }) {
           .ilike('name', pattern)
           .limit(15),
       ])
-      setTasks((tasksRes.data ?? []) as TaskResult[])
-      setProjects((projectsRes.data ?? []) as ProjectResult[])
+      setTasks((tasksRes.data ?? []) as unknown as TaskResult[])
+      setProjects((projectsRes.data ?? []) as unknown as ProjectResult[])
       setLoading(false)
     }, 280)
 
