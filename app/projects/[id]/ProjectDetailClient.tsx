@@ -170,7 +170,7 @@ export default function ProjectDetailClient({ project, tasks, allAreas, userId }
         )}
 
         {datedTasks.map(task => (
-          <TaskItem key={task.id} task={task} allAreas={allAreas} onRefresh={() => startTransition(() => router.refresh())} userId={userId} />
+          <TaskItem key={task.id} task={task} onRefresh={() => startTransition(() => router.refresh())} userId={userId} />
         ))}
 
         {undatedTasks.length > 0 && (
@@ -181,14 +181,14 @@ export default function ProjectDetailClient({ project, tasks, allAreas, userId }
               </div>
             )}
             {undatedTasks.map(task => (
-              <TaskItem key={task.id} task={task} allAreas={allAreas} onRefresh={() => startTransition(() => router.refresh())} userId={userId} />
+              <TaskItem key={task.id} task={task} onRefresh={() => startTransition(() => router.refresh())} userId={userId} />
             ))}
           </>
         )}
       </div>
 
       {showTaskModal && (
-        <TaskModal projectId={project.id} userId={userId} allAreas={allAreas} onClose={() => setShowTaskModal(false)} onSaved={() => { setShowTaskModal(false); startTransition(() => router.refresh()) }} />
+        <TaskModal projectId={project.id} userId={userId} onClose={() => setShowTaskModal(false)} onSaved={() => { setShowTaskModal(false); startTransition(() => router.refresh()) }} />
       )}
       {showProjectModal && (
         <ProjectModal project={project} allAreas={allAreas} userId={userId} onClose={() => setShowProjectModal(false)} onSaved={() => { setShowProjectModal(false); router.push('/') }} />

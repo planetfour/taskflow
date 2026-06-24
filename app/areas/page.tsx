@@ -13,26 +13,22 @@ export default async function AreasPage() {
 
   const areaIds = (areas ?? []).map(a => a.id)
 
-  const [{ data: allProjectRows }, { data: allTaskRows }] = await Promise.all([
-    areaIds.length > 0
-      ? supabase.from('project_areas').select('area_id, projects(id, name, color, status, priority)').in('area_id', areaIds)
-      : Promise.resolve({ data: [] as { area_id: string; projects: unknown }[] }),
-    areaIds.length > 0
-      ? supabase.from('task_areas').select('area_id, tasks(id, title, status, priority, deadline, project_id)').in('area_id', areaIds)
-      : Promise.resolve({ data: [] as { area_id: string; tasks: unknown }[] }),
-  ])
+  const { data: allProjectRows } = areaIds.length > 0
+    ? await supabase.from('project_areas')
+        .select('area_id, projects(id, name, color, status, priority, tasks(id, title, status, priority, deadline, project_id))')
+        .in('area_id', areaIds)
+    : { data: [] as { area_id: string; projects: unknown }[] }
 
   const areaProjectsMap: Record<string, unknown[]> = {}
   const areaTasksMap: Record<string, unknown[]> = {}
 
   ;(allProjectRows ?? []).forEach((r: { area_id: string; projects: unknown }) => {
+    const proj = r.projects as { id: string; tasks?: unknown[] } | null
+    if (!proj) return
     if (!areaProjectsMap[r.area_id]) areaProjectsMap[r.area_id] = []
-    if (r.projects) areaProjectsMap[r.area_id].push(r.projects)
-  })
-
-  ;(allTaskRows ?? []).forEach((r: { area_id: string; tasks: unknown }) => {
+    areaProjectsMap[r.area_id].push(r.projects)
     if (!areaTasksMap[r.area_id]) areaTasksMap[r.area_id] = []
-    if (r.tasks) areaTasksMap[r.area_id].push(r.tasks)
+    ;(proj.tasks ?? []).forEach(t => areaTasksMap[r.area_id].push(t))
   })
 
   const areasWithContent = (areas ?? []).map(a => ({

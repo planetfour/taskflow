@@ -34,18 +34,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   if (!project) redirect('/')
 
   const projectAreas = (projectAreaRows ?? []).map((r: { areas: unknown }) => r.areas).flat() as Area[]
-
-  const taskIds = (tasks ?? []).map(t => t.id)
-  let taskAreaMap: Record<string, Area[]> = {}
-  if (taskIds.length > 0) {
-    const { data: taskAreaRows } = await supabase.from('task_areas').select('task_id, areas(*)').in('task_id', taskIds)
-    ;(taskAreaRows ?? []).forEach((r: { task_id: string; areas: unknown }) => {
-      if (!taskAreaMap[r.task_id]) taskAreaMap[r.task_id] = []
-      taskAreaMap[r.task_id].push(r.areas as Area)
-    })
-  }
-
-  const tasksWithAreas = (tasks ?? []).map(t => ({ ...t, areas: taskAreaMap[t.id] ?? [] })) as Task[]
+  const tasksWithAreas = (tasks ?? []).map(t => ({ ...t, areas: projectAreas })) as Task[]
   const nested = nestTasks(tasksWithAreas)
 
   return <ProjectDetailClient project={{ ...project, areas: projectAreas }} tasks={nested} allAreas={allAreas ?? []} userId={user.id} />

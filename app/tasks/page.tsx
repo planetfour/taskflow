@@ -12,7 +12,7 @@ export default async function AllTasksPage() {
 
   const [{ data: tasks }, allAreasResult] = await Promise.all([
     supabase.from('tasks')
-      .select('*, projects(name, color)')
+      .select('*, projects(name, color, project_areas(areas(*)))')
       .eq('user_id', user.id)
       .is('parent_task_id', null)
       .order('status')
@@ -21,21 +21,11 @@ export default async function AllTasksPage() {
     supabase.from('areas').select('*').eq('user_id', user.id).order('name'),
   ])
 
-  const taskIds = (tasks ?? []).map(t => t.id)
-
-  const taskAreaResult = taskIds.length > 0
-    ? await supabase.from('task_areas').select('task_id, areas(*)').in('task_id', taskIds)
-    : { data: null }
-
-  const taskAreaMap: Record<string, Area[]> = {}
-  ;((taskAreaResult.data ?? []) as { task_id: string; areas: unknown }[]).forEach(r => {
-    if (!taskAreaMap[r.task_id]) taskAreaMap[r.task_id] = []
-    taskAreaMap[r.task_id].push(r.areas as Area)
-  })
-
   const tasksWithAreas = (tasks ?? []).map(t => ({
     ...t,
-    areas: taskAreaMap[t.id] ?? [],
+    areas: ((t.projects as any)?.project_areas ?? [])
+      .map((pa: { areas: unknown }) => pa.areas as Area)
+      .filter(Boolean),
   }))
 
   return <AllTasksClient

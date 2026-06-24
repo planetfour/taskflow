@@ -18,7 +18,7 @@ export default async function InsightsPage() {
     allAreasResult,
   ] = await Promise.all([
     supabase.from('tasks')
-      .select('id, completed_at')
+      .select('id, completed_at, project_id')
       .eq('user_id', user.id)
       .eq('status', 'done')
       .not('completed_at', 'is', null)
@@ -31,22 +31,22 @@ export default async function InsightsPage() {
     supabase.from('areas').select('*').eq('user_id', user.id).order('name'),
   ])
 
-  const taskIds = (recentDone ?? []).map(t => t.id)
+  const projectIds = [...new Set((recentDone ?? []).map(t => t.project_id).filter(Boolean) as string[])]
 
-  const { data: taskAreaRows } = taskIds.length > 0
-    ? await supabase.from('task_areas').select('task_id, areas(*)').in('task_id', taskIds)
+  const { data: projectAreaRows } = projectIds.length > 0
+    ? await supabase.from('project_areas').select('project_id, areas(*)').in('project_id', projectIds)
     : { data: null }
 
-  const taskAreaMap: Record<string, Area[]> = {}
-  ;((taskAreaRows ?? []) as { task_id: string; areas: unknown }[]).forEach(r => {
-    if (!taskAreaMap[r.task_id]) taskAreaMap[r.task_id] = []
-    taskAreaMap[r.task_id].push(r.areas as Area)
+  const projectAreaMap: Record<string, Area[]> = {}
+  ;((projectAreaRows ?? []) as { project_id: string; areas: unknown }[]).forEach(r => {
+    if (!projectAreaMap[r.project_id]) projectAreaMap[r.project_id] = []
+    projectAreaMap[r.project_id].push(r.areas as Area)
   })
 
   const tasks = (recentDone ?? []).map(t => ({
     id: t.id,
     completed_at: t.completed_at as string,
-    areas: taskAreaMap[t.id] ?? [],
+    areas: projectAreaMap[t.project_id ?? ''] ?? [],
   }))
 
   return (

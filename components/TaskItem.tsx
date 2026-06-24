@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, startTransition } from 'react'
-import { Task, Area } from '@/lib/types'
+import { Task } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import PriorityBadge from './PriorityBadge'
 import DeadlineBadge from './DeadlineBadge'
@@ -14,13 +14,12 @@ const HOLD_COLOR = '#eab308'
 
 interface Props {
   task: Task
-  allAreas: Area[]
   depth?: number
   onRefresh: () => void
   userId: string
 }
 
-export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId }: Props) {
+export default function TaskItem({ task, depth = 0, onRefresh, userId }: Props) {
   const [localStatus, setLocalStatus] = useState(task.status)
   const [expanded, setExpanded] = useState(false)
   const [addingSubtask, setAddingSubtask] = useState(false)
@@ -58,10 +57,6 @@ export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId 
         recurrence_type: task.recurrence_type,
         recurrence_interval: task.recurrence_interval,
       }).select('id').single()
-      const areaIds = (task.areas ?? []).map(a => a.id)
-      if (newTask && areaIds.length > 0) {
-        await supabase.from('task_areas').insert(areaIds.map(area_id => ({ task_id: newTask.id, area_id })))
-      }
     }
 
     startTransition(() => onRefresh())
@@ -166,12 +161,12 @@ export default function TaskItem({ task, allAreas, depth = 0, onRefresh, userId 
       </div>
 
       {expanded && hasSubtasks && task.subtasks!.map(sub => (
-        <TaskItem key={sub.id} task={sub} allAreas={allAreas} depth={depth + 1} onRefresh={onRefresh} userId={userId} />
+        <TaskItem key={sub.id} task={sub} depth={depth + 1} onRefresh={onRefresh} userId={userId} />
       ))}
 
       {editing && (
         <TaskEditModal
-          task={task} allAreas={allAreas} userId={userId}
+          task={task} userId={userId}
           onClose={() => setEditing(false)}
           onSaved={() => { setEditing(false); startTransition(() => onRefresh()) }}
         />

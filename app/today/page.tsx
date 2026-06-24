@@ -13,9 +13,9 @@ export default async function TodayPage() {
   const today = new Date().toISOString().split('T')[0]
   const in7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-  const [{ data: tasks }, { data: recurringRaw }] = await Promise.all([
+  const [{ data: tasks }, { data: recurringRaw }, allAreasResult] = await Promise.all([
     supabase.from('tasks')
-      .select('*, projects(id, name, color)')
+      .select('*, projects(id, name, color, project_areas(areas(*)))')
       .eq('user_id', user.id)
       .is('parent_task_id', null)
       .neq('status', 'done')
@@ -24,7 +24,7 @@ export default async function TodayPage() {
       .order('deadline', { ascending: true })
       .order('priority'),
     supabase.from('tasks')
-      .select('*, projects(id, name, color)')
+      .select('*, projects(id, name, color, project_areas(areas(*)))')
       .eq('user_id', user.id)
       .is('parent_task_id', null)
       .neq('status', 'done')
@@ -32,28 +32,18 @@ export default async function TodayPage() {
       .or(`deadline.is.null,deadline.gt.${in7Days}`)
       .order('recurrence_type')
       .order('priority'),
-  ])
-
-  const allRaw = [...(tasks ?? []), ...(recurringRaw ?? [])]
-  const taskIds = allRaw.map(t => t.id)
-
-  const [taskAreaResult, allAreasResult] = await Promise.all([
-    taskIds.length > 0
-      ? supabase.from('task_areas').select('task_id, areas(*)').in('task_id', taskIds)
-      : Promise.resolve({ data: null }),
     supabase.from('areas').select('*').eq('user_id', user.id).order('name'),
   ])
-
-  const taskAreaMap: Record<string, Area[]> = {}
-  ;((taskAreaResult.data ?? []) as { task_id: string; areas: unknown }[]).forEach(r => {
-    if (!taskAreaMap[r.task_id]) taskAreaMap[r.task_id] = []
-    taskAreaMap[r.task_id].push(r.areas as Area)
-  })
 
   type TaskWithProject = Task & { projects: { id: string; name: string; color: string } | null }
 
   function withAreas(raw: typeof tasks): TaskWithProject[] {
-    return (raw ?? []).map(t => ({ ...t, areas: taskAreaMap[t.id] ?? [] })) as TaskWithProject[]
+    return (raw ?? []).map(t => ({
+      ...t,
+      areas: ((t.projects as any)?.project_areas ?? [])
+        .map((pa: { areas: unknown }) => pa.areas as Area)
+        .filter(Boolean),
+    })) as TaskWithProject[]
   }
 
   return (

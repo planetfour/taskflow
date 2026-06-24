@@ -1,15 +1,13 @@
 'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Priority, Area, RecurrenceType } from '@/lib/types'
+import { Priority, RecurrenceType } from '@/lib/types'
 import { X } from 'lucide-react'
-import AreaPicker from './AreaPicker'
 import RecurrencePicker from './RecurrencePicker'
 
 interface Props {
   projectId: string
   userId: string
-  allAreas: Area[]
   onClose: () => void
   onSaved: () => void
 }
@@ -19,15 +17,13 @@ const labelStyle: React.CSSProperties = {
   textTransform: 'uppercase', display: 'block', marginBottom: 6,
 }
 
-export default function TaskModal({ projectId, userId, allAreas, onClose, onSaved }: Props) {
+export default function TaskModal({ projectId, userId, onClose, onSaved }: Props) {
   const [title, setTitle] = useState('')
   const [notes, setNotes] = useState('')
   const [priority, setPriority] = useState<Priority>('medium')
   const [deadline, setDeadline] = useState('')
   const [recurrenceType, setRecurrenceType] = useState<RecurrenceType | null>(null)
   const [recurrenceInterval, setRecurrenceInterval] = useState<number | null>(null)
-  const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>([])
-  const [localAreas, setLocalAreas] = useState<Area[]>(allAreas)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const supabase = createClient()
@@ -35,19 +31,15 @@ export default function TaskModal({ projectId, userId, allAreas, onClose, onSave
   async function handleSave() {
     if (!title.trim()) { setError('Title is required'); return }
     setLoading(true)
-    const { data, error } = await supabase.from('tasks').insert({
+    const { error } = await supabase.from('tasks').insert({
       title: title.trim(), notes: notes.trim() || null,
       priority, deadline: deadline || null,
       project_id: projectId, user_id: userId,
       status: 'todo', parent_task_id: null,
       recurrence_type: recurrenceType,
       recurrence_interval: recurrenceInterval,
-    }).select().single()
+    })
     if (error) { setError(error.message); setLoading(false); return }
-
-    if (data && selectedAreaIds.length > 0) {
-      await supabase.from('task_areas').insert(selectedAreaIds.map(area_id => ({ task_id: data.id, area_id })))
-    }
     setLoading(false)
     onSaved()
   }
@@ -95,17 +87,6 @@ export default function TaskModal({ projectId, userId, allAreas, onClose, onSave
             <label style={labelStyle}>Recurrence</label>
             <RecurrencePicker type={recurrenceType} interval={recurrenceInterval}
               onChange={(t, i) => { setRecurrenceType(t); setRecurrenceInterval(i) }} />
-          </div>
-          <div>
-            <label style={labelStyle}>Areas</label>
-            <AreaPicker
-              allAreas={localAreas}
-              selectedIds={selectedAreaIds}
-              onChange={setSelectedAreaIds}
-              userId={userId}
-              onAreaCreated={a => setLocalAreas(p => [...p, a])}
-              onAreaDeleted={id => setLocalAreas(p => p.filter(x => x.id !== id))}
-            />
           </div>
 
           {error && <p style={{ color: 'var(--red)', fontSize: 13 }}>{error}</p>}
