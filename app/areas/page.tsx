@@ -6,13 +6,19 @@ export const dynamic = 'force-dynamic'
 
 export default async function AreasPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user
   if (!user) redirect('/login')
 
-  // Step 1: fetch areas and all projects in parallel
-  const [{ data: areas }, { data: allProjects }] = await Promise.all([
+  // Step 1: fetch areas, all projects, and all active tasks in parallel
+  const [{ data: areas }, { data: allProjects }, { data: allActiveTasks }] = await Promise.all([
     supabase.from('areas').select('*').eq('user_id', user.id).order('name'),
     supabase.from('projects').select('id, name, color, status, priority').eq('user_id', user.id),
+    supabase.from('tasks')
+      .select('id, title, status, priority, deadline, project_id')
+      .eq('user_id', user.id)
+      .is('parent_task_id', null)
+      .neq('status', 'done'),
   ])
 
   const areaIds = (areas ?? []).map(a => a.id)
@@ -30,19 +36,11 @@ export default async function AreasPage() {
       : Promise.resolve({ data: [] as any[] }),
   ])
 
-  // Step 3: compute no-area projects
+  // Step 3: compute no-area projects and their tasks, from data already fetched in step 1
   const projectIdsWithArea = new Set((paRows ?? []).map((r: any) => r.project_id))
   const noAreaProjects = (allProjects ?? []).filter(p => !projectIdsWithArea.has(p.id))
-  const noAreaProjectIds = noAreaProjects.map(p => p.id)
-
-  // Step 4: fetch tasks for no-area projects
-  const { data: noAreaTasks } = noAreaProjectIds.length > 0
-    ? await supabase.from('tasks')
-        .select('id, title, status, priority, deadline, project_id')
-        .in('project_id', noAreaProjectIds)
-        .is('parent_task_id', null)
-        .neq('status', 'done')
-    : { data: [] as any[] }
+  const noAreaProjectIds = new Set(noAreaProjects.map(p => p.id))
+  const noAreaTasks = (allActiveTasks ?? []).filter(t => t.project_id && noAreaProjectIds.has(t.project_id))
 
   const areaProjectsMap: Record<string, unknown[]> = {}
   const areaTasksMap: Record<string, unknown[]> = {}

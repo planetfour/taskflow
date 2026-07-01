@@ -7,22 +7,15 @@ export const dynamic = 'force-dynamic'
 
 export default async function ProjectsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user
   if (!user) redirect('/login')
 
   const [{ data: projects }, { data: areas }, { data: allTasks }] = await Promise.all([
-    supabase.from('projects').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+    supabase.from('projects').select('*, project_areas(areas(*))').eq('user_id', user.id).order('created_at', { ascending: false }),
     supabase.from('areas').select('*').eq('user_id', user.id).order('name'),
     supabase.from('tasks').select('project_id, status').eq('user_id', user.id),
   ])
-
-  const projectIds = (projects ?? []).map(p => p.id)
-
-  if (projectIds.length === 0) {
-    return <ProjectsClient projects={[]} allAreas={areas ?? []} userId={user.id} />
-  }
-
-  const { data: paRows } = await supabase.from('project_areas').select('project_id, areas(*)').in('project_id', projectIds)
 
   const taskCounts: Record<string, { total: number; done: number }> = {}
   ;(allTasks ?? []).forEach((t: { project_id: string; status: string }) => {
@@ -32,23 +25,15 @@ export default async function ProjectsPage() {
     if (t.status === 'done') taskCounts[t.project_id].done++
   })
 
-  const projectAreasMap: Record<string, Area[]> = {}
-  ;((paRows ?? []) as { project_id: string; areas: unknown }[]).forEach(r => {
-    if (!projectAreasMap[r.project_id]) projectAreasMap[r.project_id] = []
-    const areaVal = r.areas
-    if (Array.isArray(areaVal)) {
-      areaVal.filter(Boolean).forEach(a => projectAreasMap[r.project_id].push(a as Area))
-    } else if (areaVal) {
-      projectAreasMap[r.project_id].push(areaVal as Area)
+  const projectsWithData = (projects ?? []).map(p => {
+    const projectAreas = ((p as any).project_areas ?? []) as { areas: Area }[]
+    return {
+      ...p,
+      task_count: taskCounts[p.id]?.total ?? 0,
+      completed_count: taskCounts[p.id]?.done ?? 0,
+      areas: projectAreas.map(r => r.areas).filter(Boolean),
     }
   })
-
-  const projectsWithData = (projects ?? []).map(p => ({
-    ...p,
-    task_count: taskCounts[p.id]?.total ?? 0,
-    completed_count: taskCounts[p.id]?.done ?? 0,
-    areas: projectAreasMap[p.id] ?? [],
-  }))
 
   return <ProjectsClient projects={projectsWithData} allAreas={areas ?? []} userId={user.id} />
 }

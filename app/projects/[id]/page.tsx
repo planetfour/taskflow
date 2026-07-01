@@ -22,7 +22,8 @@ export const dynamic = 'force-dynamic'
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user
   if (!user) redirect('/login')
 
   const [{ data: project }, { data: projectAreaRows }, { data: tasks }, { data: allAreas }] = await Promise.all([

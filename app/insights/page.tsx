@@ -7,7 +7,8 @@ export const dynamic = 'force-dynamic'
 
 export default async function InsightsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user
   if (!user) redirect('/login')
 
   const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
@@ -18,7 +19,7 @@ export default async function InsightsPage() {
     allAreasResult,
   ] = await Promise.all([
     supabase.from('tasks')
-      .select('id, completed_at, project_id')
+      .select('id, completed_at, project_id, projects(project_areas(areas(*)))')
       .eq('user_id', user.id)
       .eq('status', 'done')
       .not('completed_at', 'is', null)
@@ -31,22 +32,12 @@ export default async function InsightsPage() {
     supabase.from('areas').select('*').eq('user_id', user.id).order('name'),
   ])
 
-  const projectIds = [...new Set((recentDone ?? []).map(t => t.project_id).filter(Boolean) as string[])]
+  type DoneTaskRow = { id: string; completed_at: string | null; project_id: string | null; projects: { project_areas: { areas: Area }[] } | null }
 
-  const { data: projectAreaRows } = projectIds.length > 0
-    ? await supabase.from('project_areas').select('project_id, areas(*)').in('project_id', projectIds)
-    : { data: null }
-
-  const projectAreaMap: Record<string, Area[]> = {}
-  ;((projectAreaRows ?? []) as { project_id: string; areas: unknown }[]).forEach(r => {
-    if (!projectAreaMap[r.project_id]) projectAreaMap[r.project_id] = []
-    projectAreaMap[r.project_id].push(r.areas as Area)
-  })
-
-  const tasks = (recentDone ?? []).map(t => ({
+  const tasks = ((recentDone ?? []) as unknown as DoneTaskRow[]).map(t => ({
     id: t.id,
     completed_at: t.completed_at as string,
-    areas: projectAreaMap[t.project_id ?? ''] ?? [],
+    areas: (t.projects?.project_areas ?? []).map(r => r.areas).filter(Boolean),
   }))
 
   return (
