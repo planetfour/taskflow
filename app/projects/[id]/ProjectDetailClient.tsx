@@ -2,7 +2,6 @@
 import { useState, startTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Project, Task, Area, Priority, TaskStatus } from '@/lib/types'
-import Nav from '@/components/Nav'
 import TaskItem from '@/components/TaskItem'
 import TaskModal from '@/components/TaskModal'
 import ProjectModal from '@/components/ProjectModal'
@@ -193,7 +192,6 @@ export default function ProjectDetailClient({ project, tasks, allAreas, userId }
       {showProjectModal && (
         <ProjectModal project={project} allAreas={allAreas} userId={userId} onClose={() => setShowProjectModal(false)} onSaved={() => { setShowProjectModal(false); router.push('/') }} />
       )}
-      <Nav />
     </div>
   )
 }

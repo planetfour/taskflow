@@ -9,6 +9,8 @@ export default function Nav() {
   const pathname = usePathname()
   const router = useRouter()
 
+  if (pathname === '/login') return null
+
   async function signOut() {
     const supabase = createClient()
     await supabase.auth.signOut()

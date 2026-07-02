@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import Nav from '@/components/Nav'
 import DeadlineBadge from '@/components/DeadlineBadge'
 import { Search, LayoutGrid, CheckSquare, Circle, CheckCircle2, Clock } from 'lucide-react'
 
@@ -188,8 +187,6 @@ export default function SearchClient({ userId }: { userId: string }) {
           </div>
         )}
       </div>
-
-      <Nav />
     </div>
   )
 }

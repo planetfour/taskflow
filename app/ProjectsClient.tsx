@@ -2,7 +2,6 @@
 import { useState, startTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Project, Area, ProjectStatus, Priority } from '@/lib/types'
-import Nav from '@/components/Nav'
 import ProjectModal from '@/components/ProjectModal'
 import DeadlineBadge from '@/components/DeadlineBadge'
 import { Plus, ChevronDown, ChevronRight, LayoutGrid } from 'lucide-react'
@@ -211,7 +210,6 @@ export default function ProjectsClient({ projects, allAreas, userId }: Props) {
           onClose={() => setShowModal(false)}
           onSaved={() => { setShowModal(false); startTransition(() => router.refresh()) }} />
       )}
-      <Nav />
     </div>
   )
 }

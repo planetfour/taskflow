@@ -1,6 +1,5 @@
 'use client'
 import { Area } from '@/lib/types'
-import Nav from '@/components/Nav'
 import { BarChart2 } from 'lucide-react'
 
 interface CompletedTask {
@@ -205,8 +204,6 @@ export default function InsightsClient({ tasks, totalAllTime, allAreas }: Props)
           </div>
         )}
       </div>
-
-      <Nav />
     </div>
   )
 }

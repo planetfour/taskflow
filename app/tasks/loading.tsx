@@ -1,4 +1,3 @@
-import Nav from '@/components/Nav'
 import { CheckSquare } from 'lucide-react'
 
 const S = { background: 'var(--surface2)', borderRadius: 8, animation: 'skeleton-pulse 1.4s ease-in-out infinite' }
@@ -24,7 +23,6 @@ export default function Loading() {
           </div>
         ))}
       </div>
-      <Nav />
     </div>
   )
 }

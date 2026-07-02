@@ -2,7 +2,6 @@
 import { useState, startTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Task, Area, TaskStatus } from '@/lib/types'
-import Nav from '@/components/Nav'
 import DeadlineBadge from '@/components/DeadlineBadge'
 import TaskEditModal from '@/components/TaskEditModal'
 import SnoozeModal from '@/components/SnoozeModal'
@@ -344,7 +343,6 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
           onClose={() => setSnoozingTask(null)}
         />
       )}
-      <Nav />
     </div>
   )
 }

@@ -2,7 +2,6 @@
 import { useState, startTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Task, Area, TaskStatus, Priority } from '@/lib/types'
-import Nav from '@/components/Nav'
 import DeadlineBadge from '@/components/DeadlineBadge'
 import AreaTag from '@/components/AreaTag'
 import TaskEditModal from '@/components/TaskEditModal'
@@ -297,7 +296,6 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
           onSaved={() => { setEditingTask(null); startTransition(() => router.refresh()) }}
         />
       )}
-      <Nav />
     </div>
   )
 }

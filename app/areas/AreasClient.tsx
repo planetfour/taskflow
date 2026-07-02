@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Area } from '@/lib/types'
-import Nav from '@/components/Nav'
 import PriorityBadge from '@/components/PriorityBadge'
 import DeadlineBadge from '@/components/DeadlineBadge'
 import { createClient } from '@/lib/supabase/client'
@@ -308,7 +307,6 @@ export default function AreasClient({ areas, userId, noAreaProjects = [], noArea
           </div>
         )}
       </div>
-      <Nav />
     </div>
   )
 }
