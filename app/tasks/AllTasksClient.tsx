@@ -5,13 +5,14 @@ import { Task, Area, TaskStatus, Priority } from '@/lib/types'
 import DeadlineBadge from '@/components/DeadlineBadge'
 import AreaTag from '@/components/AreaTag'
 import TaskEditModal from '@/components/TaskEditModal'
+import TaskModal from '@/components/TaskModal'
 import { createClient } from '@/lib/supabase/client'
-import { CheckSquare, RotateCcw, ChevronDown, ChevronRight } from 'lucide-react'
+import { CheckSquare, RotateCcw, ChevronDown, ChevronRight, Plus } from 'lucide-react'
 import { nextDueDate, formatCompletedAt } from '@/lib/utils'
 
 const HOLD_COLOR = '#eab308'
 
-type TaskWithProject = Task & { projects: { name: string; color: string } }
+type TaskWithProject = Task & { projects: { name: string; color: string } | null }
 
 const STATUS_ORDER: TaskStatus[] = ['todo', 'holding', 'done']
 const STATUS_LABELS: Record<TaskStatus, string> = { todo: 'To Do', holding: 'Holding', done: 'Done' }
@@ -25,6 +26,7 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
   const [filterAreaIds, setFilterAreaIds] = useState<Set<string>>(new Set())
   const [filterCompletedDate, setFilterCompletedDate] = useState('')
   const [editingTask, setEditingTask] = useState<TaskWithProject | null>(null)
+  const [showTaskModal, setShowTaskModal] = useState(false)
   const [localStatuses, setLocalStatuses] = useState<Record<string, TaskStatus>>({})
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const router = useRouter()
@@ -120,11 +122,17 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
 
   return (
     <div style={{ minHeight: '100vh', paddingBottom: 80 }}>
-      <div style={{ padding: '20px 20px 0', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        <div style={{ width: 32, height: 32, background: 'var(--accent-dim)', border: '1px solid var(--accent)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <CheckSquare size={16} color="var(--accent)" />
+      <div style={{ padding: '20px 20px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, background: 'var(--accent-dim)', border: '1px solid var(--accent)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CheckSquare size={16} color="var(--accent)" />
+          </div>
+          <h1 style={{ fontWeight: 700, fontSize: 20, letterSpacing: '-0.5px' }}>All Tasks</h1>
         </div>
-        <h1 style={{ fontWeight: 700, fontSize: 20, letterSpacing: '-0.5px' }}>All Tasks</h1>
+        <button onClick={() => setShowTaskModal(true)} style={{
+          background: 'var(--accent)', color: '#fff', borderRadius: 10,
+          padding: '8px 14px', fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6,
+        }}><Plus size={16} /> Add task</button>
       </div>
 
       {/* Status filter chips */}
@@ -295,6 +303,11 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
           onClose={() => setEditingTask(null)}
           onSaved={() => { setEditingTask(null); startTransition(() => router.refresh()) }}
         />
+      )}
+      {showTaskModal && (
+        <TaskModal projectId={null} userId={userId}
+          onClose={() => setShowTaskModal(false)}
+          onSaved={() => { setShowTaskModal(false); startTransition(() => router.refresh()) }} />
       )}
     </div>
   )

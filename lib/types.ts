@@ -29,7 +29,7 @@ export interface Project {
 export interface Task {
   id: string
   created_at: string
-  project_id: string
+  project_id: string | null
   parent_task_id: string | null
   title: string
   notes: string | null

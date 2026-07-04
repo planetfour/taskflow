@@ -61,8 +61,8 @@ export default function TaskEditModal({ task, userId, onClose, onSaved }: Props)
       recurrence_interval: recurrenceInterval,
       recurrence_next_due: nextDue ?? (recurrenceType && deadline ? deadline : null),
     }
-    if (projectId && projectId !== task.project_id) {
-      payload.project_id = projectId
+    if (projectId !== (task.project_id ?? '')) {
+      payload.project_id = projectId || null
     }
 
     const { error: updateError } = await supabase.from('tasks').update(payload).eq('id', task.id)
@@ -72,7 +72,7 @@ export default function TaskEditModal({ task, userId, onClose, onSaved }: Props)
       await supabase.from('tasks').insert({
         title: task.title, notes: task.notes,
         priority: task.priority, status: 'todo',
-        project_id: projectId || task.project_id, user_id: userId,
+        project_id: projectId || null, user_id: userId,
         parent_task_id: task.parent_task_id,
         deadline: nextDue,
         recurrence_type: recurrenceType,
@@ -119,6 +119,7 @@ export default function TaskEditModal({ task, userId, onClose, onSaved }: Props)
           <div>
             <label style={labelStyle}>Project</label>
             <select value={projectId} onChange={e => setProjectId(e.target.value)} style={{ width: '100%' }}>
+              <option value="">No Project</option>
               {projects.map(p => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}

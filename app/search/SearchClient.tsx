@@ -13,7 +13,7 @@ type TaskResult = {
   status: string
   priority: string
   deadline: string | null
-  project_id: string
+  project_id: string | null
   projects: { id: string; name: string; color: string } | null
 }
 
@@ -154,34 +154,41 @@ export default function SearchClient({ userId }: { userId: string }) {
             {tasks.map(t => {
               const proj = t.projects
               const borderColor = proj?.color ?? 'var(--border)'
-              return (
-                <Link key={t.id} href={`/projects/${t.project_id}`} style={{ display: 'block', textDecoration: 'none', color: 'inherit', marginBottom: 6 }}>
-                  <div style={{
-                    background: 'var(--surface)', border: '1px solid var(--border)',
-                    borderRadius: 12, padding: '11px 13px',
-                    borderLeft: `3px solid ${borderColor}`,
-                    opacity: t.status === 'done' ? 0.55 : 1,
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                      <div style={{ paddingTop: 2, flexShrink: 0 }}>{statusIcon(t.status)}</div>
-                      <div style={{ flex: 1 }}>
-                        <p style={{
-                          fontSize: 14, fontWeight: 500, marginBottom: 4,
-                          textDecoration: t.status === 'done' ? 'line-through' : 'none',
-                        }}>{t.title}</p>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                          {proj && (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: proj.color }}>
-                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: proj.color, flexShrink: 0 }} />
-                              {proj.name}
-                            </span>
-                          )}
-                          <DeadlineBadge date={t.deadline} />
-                        </div>
+              const card = (
+                <div style={{
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: 12, padding: '11px 13px',
+                  borderLeft: `3px solid ${borderColor}`,
+                  opacity: t.status === 'done' ? 0.55 : 1,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                    <div style={{ paddingTop: 2, flexShrink: 0 }}>{statusIcon(t.status)}</div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{
+                        fontSize: 14, fontWeight: 500, marginBottom: 4,
+                        textDecoration: t.status === 'done' ? 'line-through' : 'none',
+                      }}>{t.title}</p>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                        {proj ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: proj.color }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: proj.color, flexShrink: 0 }} />
+                            {proj.name}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)' }}>No Project</span>
+                        )}
+                        <DeadlineBadge date={t.deadline} />
                       </div>
                     </div>
                   </div>
+                </div>
+              )
+              return t.project_id ? (
+                <Link key={t.id} href={`/projects/${t.project_id}`} style={{ display: 'block', textDecoration: 'none', color: 'inherit', marginBottom: 6 }}>
+                  {card}
                 </Link>
+              ) : (
+                <div key={t.id} style={{ marginBottom: 6 }}>{card}</div>
               )
             })}
           </div>

@@ -3,8 +3,9 @@ import { useState, startTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Project, Area, ProjectStatus, Priority } from '@/lib/types'
 import ProjectModal from '@/components/ProjectModal'
+import TaskModal from '@/components/TaskModal'
 import DeadlineBadge from '@/components/DeadlineBadge'
-import { Plus, ChevronDown, ChevronRight, LayoutGrid } from 'lucide-react'
+import { Plus, ChevronDown, ChevronRight, LayoutGrid, ClipboardList } from 'lucide-react'
 import Link from 'next/link'
 
 const STATUS_ORDER: ProjectStatus[] = ['active', 'paused', 'completed', 'archived']
@@ -16,6 +17,7 @@ interface Props { projects: Project[]; allAreas: Area[]; userId: string }
 
 export default function ProjectsClient({ projects, allAreas, userId }: Props) {
   const [showModal, setShowModal] = useState(false)
+  const [showNoProjectTaskModal, setShowNoProjectTaskModal] = useState(false)
   const [filterStatuses, setFilterStatuses] = useState<Set<ProjectStatus>>(new Set(['active', 'paused']))
   const [filterAreaIds, setFilterAreaIds] = useState<Set<string>>(new Set())
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
@@ -139,6 +141,16 @@ export default function ProjectsClient({ projects, allAreas, userId }: Props) {
       )}
 
       <div style={{ padding: '0 16px' }}>
+        <button onClick={() => setShowNoProjectTaskModal(true)} style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+          background: 'var(--surface)', border: '1px dashed var(--border)',
+          borderRadius: 14, padding: '12px 14px', marginBottom: 12,
+          color: 'var(--text-muted)', fontWeight: 600, fontSize: 13,
+        }}>
+          <ClipboardList size={16} />
+          Add a task with no project
+        </button>
+
         {filteredProjects.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
             {projects.length === 0
@@ -209,6 +221,11 @@ export default function ProjectsClient({ projects, allAreas, userId }: Props) {
         <ProjectModal allAreas={allAreas} userId={userId}
           onClose={() => setShowModal(false)}
           onSaved={() => { setShowModal(false); startTransition(() => router.refresh()) }} />
+      )}
+      {showNoProjectTaskModal && (
+        <TaskModal projectId={null} userId={userId}
+          onClose={() => setShowNoProjectTaskModal(false)}
+          onSaved={() => { setShowNoProjectTaskModal(false); startTransition(() => router.refresh()) }} />
       )}
     </div>
   )

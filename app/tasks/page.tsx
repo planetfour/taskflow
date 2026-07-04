@@ -30,7 +30,7 @@ export default async function AllTasksPage() {
   }))
 
   return <AllTasksClient
-    tasks={tasksWithAreas as (Task & { projects: { name: string; color: string } })[]}
+    tasks={tasksWithAreas as (Task & { projects: { name: string; color: string } | null })[]}
     allAreas={allAreasResult.data ?? []}
     userId={user.id}
   />

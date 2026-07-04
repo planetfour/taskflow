@@ -6,7 +6,7 @@ import { X } from 'lucide-react'
 import RecurrencePicker from './RecurrencePicker'
 
 interface Props {
-  projectId: string
+  projectId: string | null
   userId: string
   onClose: () => void
   onSaved: () => void
