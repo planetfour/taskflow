@@ -80,13 +80,12 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
     }).filter(Boolean) as { status: TaskStatus; priorityGroups: { priority: Priority; tasks: TaskWithProject[] }[] }[]
   }
 
-  async function toggleStatus(task: TaskWithProject) {
-    const current = effectiveStatus(task)
-    const next: TaskStatus = current === 'done' ? 'todo' : current === 'todo' ? 'holding' : 'done'
-    const completedAt = next === 'done' ? new Date().toISOString() : null
-    setLocalStatuses(prev => ({ ...prev, [task.id]: next }))
-    await supabase.from('tasks').update({ status: next, completed_at: completedAt }).eq('id', task.id)
-    if (next === 'done' && task.recurrence_type) {
+  async function markDone(task: TaskWithProject) {
+    if (effectiveStatus(task) === 'done') return
+    const completedAt = new Date().toISOString()
+    setLocalStatuses(prev => ({ ...prev, [task.id]: 'done' }))
+    await supabase.from('tasks').update({ status: 'done', completed_at: completedAt }).eq('id', task.id)
+    if (task.recurrence_type) {
       const due = nextDueDate(task.recurrence_type, task.recurrence_interval)
       await supabase.from('tasks').insert({
         title: task.title, notes: task.notes, priority: task.priority, status: 'todo',
@@ -256,7 +255,7 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
                                 cursor: 'pointer',
                               }}>
                                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                                  <button onClick={e => { e.stopPropagation(); toggleStatus(task) }} style={{
+                                  <button onClick={e => { e.stopPropagation(); markDone(task) }} style={{
                                     width: 20, height: 20, borderRadius: '50%', flexShrink: 0, marginTop: 1,
                                     border: `2px solid ${done ? 'var(--accent)' : holding ? HOLD_COLOR : 'var(--border)'}`,
                                     background: done ? 'var(--accent)' : holding ? `${HOLD_COLOR}22` : 'transparent',

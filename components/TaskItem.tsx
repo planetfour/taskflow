@@ -31,24 +31,16 @@ export default function TaskItem({ task, depth = 0, onRefresh, userId }: Props) 
 
   useEffect(() => { setLocalStatus(task.status) }, [task.status])
 
-  async function toggleStatus() {
-    const next = localStatus === 'done' ? 'todo' : localStatus === 'todo' ? 'holding' : 'done'
-    const completedAt = next === 'done' ? new Date().toISOString() : null
+  async function markDone() {
+    if (localStatus === 'done') return
+    const completedAt = new Date().toISOString()
 
-    setLocalStatus(next)
+    setLocalStatus('done')
+    await supabase.from('tasks').update({ status: 'done', completed_at: completedAt }).eq('id', task.id)
 
-    let deadlineUpdate: { deadline?: string | null } = {}
-    if (next === 'holding') {
-      deadlineUpdate = { deadline: null }
-    } else if (next === 'todo' && localStatus === 'holding' && task.recurrence_type) {
-      deadlineUpdate = { deadline: nextDueDate(task.recurrence_type, task.recurrence_interval) }
-    }
-
-    await supabase.from('tasks').update({ status: next, completed_at: completedAt, ...deadlineUpdate }).eq('id', task.id)
-
-    if (next === 'done' && task.recurrence_type) {
+    if (task.recurrence_type) {
       const due = nextDueDate(task.recurrence_type, task.recurrence_interval)
-      const { data: newTask } = await supabase.from('tasks').insert({
+      await supabase.from('tasks').insert({
         title: task.title, notes: task.notes,
         priority: task.priority, status: 'todo',
         project_id: task.project_id, user_id: userId,
@@ -56,7 +48,7 @@ export default function TaskItem({ task, depth = 0, onRefresh, userId }: Props) 
         deadline: due,
         recurrence_type: task.recurrence_type,
         recurrence_interval: task.recurrence_interval,
-      }).select('id').single()
+      })
     }
 
     startTransition(() => onRefresh())
@@ -96,7 +88,7 @@ export default function TaskItem({ task, depth = 0, onRefresh, userId }: Props) 
           cursor: 'pointer',
         }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-          <button onClick={e => { e.stopPropagation(); toggleStatus() }} style={{
+          <button onClick={e => { e.stopPropagation(); markDone() }} style={{
             width: 20, height: 20, borderRadius: '50%', flexShrink: 0, marginTop: 2,
             border: `2px solid ${done ? 'var(--accent)' : holding ? HOLD_COLOR : 'var(--border)'}`,
             background: done ? 'var(--accent)' : holding ? `${HOLD_COLOR}22` : 'transparent',
