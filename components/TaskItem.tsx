@@ -31,14 +31,14 @@ export default function TaskItem({ task, depth = 0, onRefresh, userId }: Props) 
 
   useEffect(() => { setLocalStatus(task.status) }, [task.status])
 
-  async function markDone() {
-    if (localStatus === 'done') return
-    const completedAt = new Date().toISOString()
+  async function toggleDone() {
+    const next = localStatus === 'done' ? 'todo' : 'done'
+    const completedAt = next === 'done' ? new Date().toISOString() : null
 
-    setLocalStatus('done')
-    await supabase.from('tasks').update({ status: 'done', completed_at: completedAt }).eq('id', task.id)
+    setLocalStatus(next)
+    await supabase.from('tasks').update({ status: next, completed_at: completedAt }).eq('id', task.id)
 
-    if (task.recurrence_type) {
+    if (next === 'done' && task.recurrence_type) {
       const due = nextDueDate(task.recurrence_type, task.recurrence_interval)
       await supabase.from('tasks').insert({
         title: task.title, notes: task.notes,
@@ -88,7 +88,7 @@ export default function TaskItem({ task, depth = 0, onRefresh, userId }: Props) 
           cursor: 'pointer',
         }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-          <button onClick={e => { e.stopPropagation(); markDone() }} style={{
+          <button onClick={e => { e.stopPropagation(); toggleDone() }} style={{
             width: 20, height: 20, borderRadius: '50%', flexShrink: 0, marginTop: 2,
             border: `2px solid ${done ? 'var(--accent)' : holding ? HOLD_COLOR : 'var(--border)'}`,
             background: done ? 'var(--accent)' : holding ? `${HOLD_COLOR}22` : 'transparent',
