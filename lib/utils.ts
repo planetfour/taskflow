@@ -67,8 +67,8 @@ const DAY_BITS = [64, 1, 2, 4, 8, 16, 32]
 
 export function effectiveDueDate(task: { deadline: string | null; recurrence_type: RecurrenceType | null; recurrence_interval: number | null; status?: string }): string | null {
   if (task.status === 'holding') return null
-  if (task.recurrence_type === 'daily') return toLocalDate(new Date())
   if (task.deadline) return task.deadline
+  if (task.recurrence_type === 'daily') return toLocalDate(new Date())
   if (task.recurrence_type) return nextDueDate(task.recurrence_type, task.recurrence_interval)
   return null
 }
