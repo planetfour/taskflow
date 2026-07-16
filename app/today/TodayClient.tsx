@@ -7,7 +7,7 @@ import TaskEditModal from '@/components/TaskEditModal'
 import SnoozeModal from '@/components/SnoozeModal'
 import { createClient } from '@/lib/supabase/client'
 import { CalendarDays, RotateCcw, AlarmClock, ChevronDown, ChevronRight } from 'lucide-react'
-import { nextDueDate, recurrenceLabel } from '@/lib/utils'
+import { nextDueDate, recurrenceLabel, toLocalDate } from '@/lib/utils'
 
 const HOLD_COLOR = '#eab308'
 
@@ -26,7 +26,8 @@ interface Props {
   today: string
 }
 
-export default function TodayClient({ tasks, recurringTasks, allAreas, userId, today }: Props) {
+export default function TodayClient({ tasks, recurringTasks, allAreas, userId }: Props) {
+  const today = toLocalDate(new Date())
   const [editingTask, setEditingTask] = useState<TaskWithProject | null>(null)
   const [snoozingTask, setSnoozingTask] = useState<TaskWithProject | null>(null)
   const [localStatuses, setLocalStatuses] = useState<Record<string, TaskStatus>>({})
@@ -126,7 +127,7 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId, t
     const d = new Date(dateStr + 'T00:00:00')
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
-    if (dateStr === tomorrow.toISOString().split('T')[0]) return 'Tomorrow'
+    if (dateStr === toLocalDate(tomorrow)) return 'Tomorrow'
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
   }
 
