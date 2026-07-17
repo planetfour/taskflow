@@ -33,7 +33,7 @@ export default async function InsightsPage() {
       .eq('status', 'done'),
     supabase.from('areas').select('*').eq('user_id', user.id).order('name'),
     supabase.from('tasks')
-      .select('id, title, created_at, status, priority')
+      .select('*')
       .eq('user_id', user.id)
       .in('status', ['todo', 'holding'])
       .lte('created_at', thirtyDaysAgo)
@@ -54,6 +54,7 @@ export default async function InsightsPage() {
       totalAllTime={totalAllTime ?? 0}
       allAreas={allAreasResult.data ?? []}
       dormantTasks={dormant ?? []}
+      userId={user.id}
     />
   )
 }

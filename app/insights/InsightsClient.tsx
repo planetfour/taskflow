@@ -1,7 +1,9 @@
 'use client'
-import { useState } from 'react'
-import { Area, Priority, TaskStatus } from '@/lib/types'
+import { useState, startTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { Area, Task } from '@/lib/types'
 import { priorityColor } from '@/lib/utils'
+import TaskEditModal from '@/components/TaskEditModal'
 import { BarChart2, Moon, ChevronDown, ChevronRight } from 'lucide-react'
 
 const HOLD_COLOR = '#eab308'
@@ -10,14 +12,6 @@ interface CompletedTask {
   id: string
   completed_at: string
   areas: Area[]
-}
-
-interface DormantTask {
-  id: string
-  title: string
-  created_at: string
-  status: TaskStatus
-  priority: Priority
 }
 
 interface AreaRow {
@@ -29,7 +23,8 @@ interface Props {
   tasks: CompletedTask[]
   totalAllTime: number
   allAreas: Area[]
-  dormantTasks: DormantTask[]
+  dormantTasks: Task[]
+  userId: string
 }
 
 function dateStr(iso: string): string {
@@ -271,8 +266,10 @@ function AreaPieChart({ areaRows }: { areaRows: AreaRow[] }) {
   )
 }
 
-export default function InsightsClient({ tasks, totalAllTime, allAreas, dormantTasks }: Props) {
+export default function InsightsClient({ tasks, totalAllTime, allAreas, dormantTasks, userId }: Props) {
   const [dormantOpen, setDormantOpen] = useState(false)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const router = useRouter()
 
   const nowMs = Date.now()
   const today = dateStr(new Date(nowMs).toISOString())
@@ -341,16 +338,16 @@ export default function InsightsClient({ tasks, totalAllTime, allAreas, dormantT
           <DailyLineChart days={series7.days} dailyCounts={series7.dailyCounts} movingAvg={series7.movingAvg} todayStr={today} />
         </CollapsibleCard>
 
-        <CollapsibleCard title="Last 30 days">
-          <LineChartLegend />
-          <DailyLineChart days={series30.days} dailyCounts={series30.dailyCounts} movingAvg={series30.movingAvg} todayStr={today} />
-        </CollapsibleCard>
-
         {areaRows7.length > 0 && (
           <CollapsibleCard title="By area · last 7 days">
             <AreaPieChart areaRows={areaRows7} />
           </CollapsibleCard>
         )}
+
+        <CollapsibleCard title="Last 30 days">
+          <LineChartLegend />
+          <DailyLineChart days={series30.days} dailyCounts={series30.dailyCounts} movingAvg={series30.movingAvg} todayStr={today} />
+        </CollapsibleCard>
 
         {areaRows30.length > 0 && (
           <CollapsibleCard title="By area · last 30 days">
@@ -384,7 +381,15 @@ export default function InsightsClient({ tasks, totalAllTime, allAreas, dormantT
                 {dormantTasks.map(t => {
                   const ageDays = Math.floor((nowMs - new Date(t.created_at).getTime()) / 86400000)
                   return (
-                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: '1px solid var(--border)' }}>
+                    <button
+                      key={t.id}
+                      onClick={() => setEditingTask(t)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0',
+                        background: 'none', border: 'none', borderTop: '1px solid var(--border)',
+                        width: '100%', textAlign: 'left', cursor: 'pointer',
+                      }}
+                    >
                       <span style={{ width: 6, height: 6, borderRadius: '50%', background: priorityColor(t.priority), flexShrink: 0 }} />
                       <span style={{ flex: 1, fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {t.title}
@@ -397,7 +402,7 @@ export default function InsightsClient({ tasks, totalAllTime, allAreas, dormantT
                       <span style={{ fontSize: 11, color: 'var(--text-dim)', flexShrink: 0 }}>
                         {ageDays}d
                       </span>
-                    </div>
+                    </button>
                   )
                 })}
               </div>
@@ -412,6 +417,18 @@ export default function InsightsClient({ tasks, totalAllTime, allAreas, dormantT
           </div>
         )}
       </div>
+
+      {editingTask && (
+        <TaskEditModal
+          task={editingTask}
+          userId={userId}
+          onClose={() => setEditingTask(null)}
+          onSaved={() => {
+            setEditingTask(null)
+            startTransition(() => router.refresh())
+          }}
+        />
+      )}
     </div>
   )
 }
