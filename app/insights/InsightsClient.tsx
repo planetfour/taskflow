@@ -20,6 +20,11 @@ interface DormantTask {
   priority: Priority
 }
 
+interface AreaRow {
+  area: Area | null
+  count: number
+}
+
 interface Props {
   tasks: CompletedTask[]
   totalAllTime: number
@@ -56,11 +61,214 @@ function lastNDays(n: number): string[] {
   })
 }
 
-function dayLabel(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00')
-  const today = new Date().toISOString().split('T')[0]
-  if (dateStr === today) return 'Today'
-  return d.toLocaleDateString('en-US', { weekday: 'short' })
+function dayLabel(d: string, todayStr: string): string {
+  if (d === todayStr) return 'Today'
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short' })
+}
+
+function shortDateLabel(d: string): string {
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+// picks a "nice" rounded max/step (1/2/5×10^n) so gridlines land on whole numbers
+function niceTicks(max: number, count = 4): number[] {
+  if (max <= 0) return [0, 1]
+  const rawStep = max / count
+  const mag = Math.pow(10, Math.floor(Math.log10(rawStep)))
+  const norm = rawStep / mag
+  const niceNorm = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10
+  const step = Math.max(1, niceNorm * mag)
+  const niceMax = Math.ceil(max / step) * step
+  const ticks: number[] = []
+  for (let v = 0; v <= niceMax + 1e-9; v += step) ticks.push(Math.round(v))
+  return ticks
+}
+
+function buildDailySeries(tasks: CompletedTask[], rangeDays: number) {
+  const lookback = lastNDays(rangeDays + 6)
+  const counts: Record<string, number> = {}
+  lookback.forEach(d => { counts[d] = 0 })
+  tasks.forEach(t => {
+    const d = dateStr(t.completed_at)
+    if (d in counts) counts[d]++
+  })
+  const days = lookback.slice(6)
+  const dailyCounts = days.map(d => counts[d])
+  const movingAvg = days.map((_, i) => {
+    const idx = i + 6
+    const window = lookback.slice(idx - 6, idx + 1)
+    return window.reduce((s, d) => s + counts[d], 0) / 7
+  })
+  return { days, dailyCounts, movingAvg }
+}
+
+function buildAreaBreakdown(subsetTasks: CompletedTask[], allAreas: Area[]): AreaRow[] {
+  const areaCountMap: Record<string, number> = {}
+  let noAreaCount = 0
+  subsetTasks.forEach(t => {
+    if (t.areas.length === 0) { noAreaCount++; return }
+    t.areas.forEach(a => {
+      areaCountMap[a.id] = (areaCountMap[a.id] ?? 0) + 1
+    })
+  })
+  const rows: AreaRow[] = allAreas
+    .filter(a => areaCountMap[a.id] > 0)
+    .map(a => ({ area: a, count: areaCountMap[a.id] }))
+    .sort((a, b) => b.count - a.count)
+  if (noAreaCount > 0) rows.push({ area: null, count: noAreaCount })
+  return rows
+}
+
+function CollapsibleCard({ title, badge, children }: { title: string; badge?: React.ReactNode; children: React.ReactNode }) {
+  const [open, setOpen] = useState(true)
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '16px 18px', background: 'none', border: 'none', cursor: 'pointer',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            {title}
+          </span>
+          {badge}
+        </div>
+        {open ? <ChevronDown size={16} color="var(--text-muted)" /> : <ChevronRight size={16} color="var(--text-muted)" />}
+      </button>
+      {open && <div style={{ padding: '0 18px 16px' }}>{children}</div>}
+    </div>
+  )
+}
+
+function LineChartLegend() {
+  return (
+    <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-muted)', marginBottom: 10 }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)' }} />
+        Completed
+      </span>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <svg width={16} height={8}><line x1={0} y1={4} x2={16} y2={4} stroke="var(--text-muted)" strokeWidth={2} strokeDasharray="1 4" strokeLinecap="round" /></svg>
+        7-day avg
+      </span>
+    </div>
+  )
+}
+
+function DailyLineChart({ days, dailyCounts, movingAvg, todayStr }: {
+  days: string[]; dailyCounts: number[]; movingAvg: number[]; todayStr: string
+}) {
+  const [hover, setHover] = useState<number | null>(null)
+  const n = days.length
+  const ticks = niceTicks(Math.max(...dailyCounts, ...movingAvg, 1))
+  const yMax = ticks[ticks.length - 1]
+
+  const W = 320, H = 150, padLeft = 26, padRight = 10, topY = 10, xAxisH = 20
+  const baseY = H - xAxisH
+  const plotH = baseY - topY
+  const xAt = (i: number) => padLeft + i * (W - padLeft - padRight) / (n - 1)
+  const yAt = (v: number) => baseY - (v / yMax) * plotH
+
+  const linePath = dailyCounts.map((v, i) => `${i === 0 ? 'M' : 'L'}${xAt(i)},${yAt(v)}`).join(' ')
+  const avgPath = movingAvg.map((v, i) => `${i === 0 ? 'M' : 'L'}${xAt(i)},${yAt(v)}`).join(' ')
+  const labelEvery = n > 10 ? Math.ceil(n / 6) : 1
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block', overflow: 'visible' }}>
+        {ticks.map(t => (
+          <g key={t}>
+            <line x1={padLeft} y1={yAt(t)} x2={W - padRight} y2={yAt(t)} stroke="var(--border)" strokeWidth={1} />
+            <text x={padLeft - 4} y={yAt(t) + 3} fontSize={8} textAnchor="end" fill="var(--text-dim)">{t}</text>
+          </g>
+        ))}
+        <path d={avgPath} fill="none" stroke="var(--text-muted)" strokeWidth={2} strokeDasharray="1 5" strokeLinecap="round" />
+        <path d={linePath} fill="none" stroke="var(--accent)" strokeWidth={2} />
+        {dailyCounts.map((v, i) => (
+          <g key={days[i]}>
+            <circle cx={xAt(i)} cy={yAt(v)} r={3} fill="var(--accent)" stroke="var(--surface)" strokeWidth={1.5} />
+            <circle
+              cx={xAt(i)} cy={yAt(v)} r={9} fill="transparent"
+              onMouseEnter={() => setHover(i)}
+              onMouseLeave={() => setHover(null)}
+              onTouchStart={() => setHover(i)}
+              style={{ cursor: 'pointer' }}
+            >
+              <title>{`${dayLabel(days[i], todayStr)}: ${v}`}</title>
+            </circle>
+          </g>
+        ))}
+        {days.map((d, i) => (
+          i % labelEvery === 0 && (
+            <text key={d} x={xAt(i)} y={H - 4} fontSize={9} textAnchor="middle" fill={d === todayStr ? 'var(--accent)' : 'var(--text-muted)'}>
+              {n > 10 ? shortDateLabel(d) : dayLabel(d, todayStr)}
+            </text>
+          )
+        ))}
+      </svg>
+      {hover !== null && (
+        <div style={{
+          position: 'absolute',
+          left: `${(xAt(hover) / W) * 100}%`,
+          top: `${(yAt(dailyCounts[hover]) / H) * 100}%`,
+          transform: 'translate(-50%, -135%)',
+          background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6,
+          padding: '3px 7px', fontSize: 10, fontWeight: 700, color: 'var(--text)',
+          whiteSpace: 'nowrap', pointerEvents: 'none', boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+        }}>
+          {dayLabel(days[hover], todayStr)}: {dailyCounts[hover]}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AreaPieChart({ areaRows }: { areaRows: AreaRow[] }) {
+  const total = areaRows.reduce((s, r) => s + r.count, 0)
+  const cumPcts = areaRows.reduce<number[]>((acc, { count }) => (
+    [...acc, (acc[acc.length - 1] ?? 0) + (count / total) * 100]
+  ), [])
+  const stops = areaRows.map(({ area }, i) => {
+    const color = area ? area.color : '#888888'
+    const start = i === 0 ? 0 : cumPcts[i - 1]
+    return `${color} ${start}% ${cumPcts[i]}%`
+  })
+  const gradient = `conic-gradient(${stops.join(', ')})`
+
+  return (
+    <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ position: 'relative', width: 130, height: 130, borderRadius: '50%', background: gradient, flexShrink: 0 }}>
+        <div style={{
+          position: 'absolute', inset: 26, borderRadius: '50%', background: 'var(--surface)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)' }}>{total}</span>
+          <span style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>tasks</span>
+        </div>
+      </div>
+      <div style={{ flex: 1, minWidth: 120, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {areaRows.map(({ area, count }) => {
+          const color = area ? area.color : '#888888'
+          const name = area ? area.name : 'No area'
+          const pct = Math.round((count / total) * 100)
+          return (
+            <div key={area ? area.id : '__none__'} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+              <span style={{ width: 9, height: 9, borderRadius: '50%', background: color, flexShrink: 0 }} />
+              <span style={{ flex: 1, color: 'var(--text)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {name}
+              </span>
+              <span style={{ color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }}>
+                {count} · {pct}%
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 export default function InsightsClient({ tasks, totalAllTime, allAreas, dormantTasks }: Props) {
@@ -69,55 +277,18 @@ export default function InsightsClient({ tasks, totalAllTime, allAreas, dormantT
   const nowMs = Date.now()
   const today = dateStr(new Date(nowMs).toISOString())
   const sevenDaysAgo = dateStr(new Date(nowMs - 7 * 86400000).toISOString())
+  const thirtyDaysAgo = dateStr(new Date(nowMs - 30 * 86400000).toISOString())
 
   const todayCount = tasks.filter(t => dateStr(t.completed_at) === today).length
   const weekTasks = tasks.filter(t => dateStr(t.completed_at) > sevenDaysAgo)
+  const monthTasks = tasks.filter(t => dateStr(t.completed_at) > thirtyDaysAgo)
   const weekCount = weekTasks.length
   const streak = computeStreak(tasks)
 
-  // daily breakdown (last 7 days), plus 6 days of lookback so day 1's
-  // trailing 7-day average has real data behind it instead of zero-padding
-  const days13 = lastNDays(13)
-  const counts13: Record<string, number> = {}
-  days13.forEach(d => { counts13[d] = 0 })
-  tasks.forEach(t => {
-    const d = dateStr(t.completed_at)
-    if (d in counts13) counts13[d]++
-  })
-  const days = days13.slice(6)
-  const dailyCounts = days.map(d => counts13[d])
-  const movingAvg = days.map((_, i) => {
-    const idx = i + 6
-    const window = days13.slice(idx - 6, idx + 1)
-    return window.reduce((s, d) => s + counts13[d], 0) / 7
-  })
-  const maxDaily = Math.max(...dailyCounts, ...movingAvg, 1)
-
-  // area breakdown (last 7 days)
-  const areaCountMap: Record<string, number> = {}
-  let noAreaCount = 0
-  weekTasks.forEach(t => {
-    if (t.areas.length === 0) { noAreaCount++; return }
-    t.areas.forEach(a => {
-      areaCountMap[a.id] = (areaCountMap[a.id] ?? 0) + 1
-    })
-  })
-  const areaRows = allAreas
-    .filter(a => areaCountMap[a.id] > 0)
-    .map(a => ({ area: a, count: areaCountMap[a.id] }))
-    .sort((a, b) => b.count - a.count)
-  if (noAreaCount > 0) areaRows.push({ area: null as unknown as Area, count: noAreaCount })
-  const pieTotal = areaRows.reduce((s, r) => s + r.count, 0)
-
-  const pieCumPcts = areaRows.reduce<number[]>((acc, { count }) => (
-    [...acc, (acc[acc.length - 1] ?? 0) + (count / pieTotal) * 100]
-  ), [])
-  const pieStops = areaRows.map(({ area }, i) => {
-    const color = area ? area.color : '#888888'
-    const start = i === 0 ? 0 : pieCumPcts[i - 1]
-    return `${color} ${start}% ${pieCumPcts[i]}%`
-  })
-  const pieGradient = `conic-gradient(${pieStops.join(', ')})`
+  const series7 = buildDailySeries(tasks, 7)
+  const series30 = buildDailySeries(tasks, 30)
+  const areaRows7 = buildAreaBreakdown(weekTasks, allAreas)
+  const areaRows30 = buildAreaBreakdown(monthTasks, allAreas)
 
   const statCard = (label: string, value: number | string, sub?: string) => (
     <div style={{
@@ -129,14 +300,6 @@ export default function InsightsClient({ tasks, totalAllTime, allAreas, dormantT
       {sub && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1 }}>{sub}</div>}
     </div>
   )
-
-  // line chart geometry
-  const W = 300, H = 130, padX = 20, topY = 14, plotH = 74
-  const baseY = topY + plotH
-  const xAt = (i: number) => padX + i * (W - 2 * padX) / (days.length - 1)
-  const yAt = (v: number) => baseY - (v / maxDaily) * plotH
-  const linePath = dailyCounts.map((v, i) => `${i === 0 ? 'M' : 'L'}${xAt(i)},${yAt(v)}`).join(' ')
-  const avgPath = movingAvg.map((v, i) => `${i === 0 ? 'M' : 'L'}${xAt(i)},${yAt(v)}`).join(' ')
 
   return (
     <div style={{ minHeight: '100vh', paddingBottom: 80 }}>
@@ -173,76 +336,26 @@ export default function InsightsClient({ tasks, totalAllTime, allAreas, dormantT
           </div>
         </div>
 
-        {/* Daily line chart */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Last 7 days
-            </div>
-            <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-muted)' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)' }} />
-                Completed
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <svg width={16} height={8}><line x1={0} y1={4} x2={16} y2={4} stroke="var(--text-muted)" strokeWidth={2} strokeDasharray="1 4" strokeLinecap="round" /></svg>
-                7-day avg
-              </span>
-            </div>
-          </div>
-          <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
-            <line x1={padX} y1={baseY} x2={W - padX} y2={baseY} stroke="var(--border)" strokeWidth={1} />
-            <path d={avgPath} fill="none" stroke="var(--text-muted)" strokeWidth={2} strokeDasharray="1 5" strokeLinecap="round" />
-            <path d={linePath} fill="none" stroke="var(--accent)" strokeWidth={2} />
-            {dailyCounts.map((v, i) => (
-              <circle key={days[i]} cx={xAt(i)} cy={yAt(v)} r={3} fill="var(--accent)" stroke="var(--surface)" strokeWidth={1.5}>
-                <title>{`${dayLabel(days[i])}: ${v}`}</title>
-              </circle>
-            ))}
-            {days.map((d, i) => (
-              <text key={d} x={xAt(i)} y={H - 4} fontSize={9} textAnchor="middle" fill={d === today ? 'var(--accent)' : 'var(--text-muted)'}>
-                {dayLabel(d)}
-              </text>
-            ))}
-          </svg>
-        </div>
+        <CollapsibleCard title="Last 7 days">
+          <LineChartLegend />
+          <DailyLineChart days={series7.days} dailyCounts={series7.dailyCounts} movingAvg={series7.movingAvg} todayStr={today} />
+        </CollapsibleCard>
 
-        {/* Area breakdown — pie chart */}
-        {areaRows.length > 0 && (
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 18px' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14 }}>
-              By area · last 7 days
-            </div>
-            <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative', width: 130, height: 130, borderRadius: '50%', background: pieGradient, flexShrink: 0 }}>
-                <div style={{
-                  position: 'absolute', inset: 26, borderRadius: '50%', background: 'var(--surface)',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)' }}>{pieTotal}</span>
-                  <span style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>tasks</span>
-                </div>
-              </div>
-              <div style={{ flex: 1, minWidth: 120, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {areaRows.map(({ area, count }) => {
-                  const color = area ? area.color : '#888888'
-                  const name = area ? area.name : 'No area'
-                  const pct = Math.round((count / pieTotal) * 100)
-                  return (
-                    <div key={area ? area.id : '__none__'} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                      <span style={{ width: 9, height: 9, borderRadius: '50%', background: color, flexShrink: 0 }} />
-                      <span style={{ flex: 1, color: 'var(--text)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {name}
-                      </span>
-                      <span style={{ color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }}>
-                        {count} · {pct}%
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
+        <CollapsibleCard title="Last 30 days">
+          <LineChartLegend />
+          <DailyLineChart days={series30.days} dailyCounts={series30.dailyCounts} movingAvg={series30.movingAvg} todayStr={today} />
+        </CollapsibleCard>
+
+        {areaRows7.length > 0 && (
+          <CollapsibleCard title="By area · last 7 days">
+            <AreaPieChart areaRows={areaRows7} />
+          </CollapsibleCard>
+        )}
+
+        {areaRows30.length > 0 && (
+          <CollapsibleCard title="By area · last 30 days">
+            <AreaPieChart areaRows={areaRows30} />
+          </CollapsibleCard>
         )}
 
         {/* Dormant tasks */}
