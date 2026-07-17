@@ -12,11 +12,13 @@ export default async function InsightsPage() {
   if (!user) redirect('/login')
 
   const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
   const [
     { data: recentDone },
     { count: totalAllTime },
     allAreasResult,
+    { data: dormant },
   ] = await Promise.all([
     supabase.from('tasks')
       .select('id, completed_at, project_id, projects(project_areas(areas(*)))')
@@ -30,6 +32,12 @@ export default async function InsightsPage() {
       .eq('user_id', user.id)
       .eq('status', 'done'),
     supabase.from('areas').select('*').eq('user_id', user.id).order('name'),
+    supabase.from('tasks')
+      .select('id, title, created_at, status, priority')
+      .eq('user_id', user.id)
+      .in('status', ['todo', 'holding'])
+      .lte('created_at', thirtyDaysAgo)
+      .order('created_at', { ascending: true }),
   ])
 
   type DoneTaskRow = { id: string; completed_at: string | null; project_id: string | null; projects: { project_areas: { areas: Area }[] } | null }
@@ -45,6 +53,7 @@ export default async function InsightsPage() {
       tasks={tasks}
       totalAllTime={totalAllTime ?? 0}
       allAreas={allAreasResult.data ?? []}
+      dormantTasks={dormant ?? []}
     />
   )
 }

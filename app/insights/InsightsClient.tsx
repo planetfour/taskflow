@@ -1,6 +1,10 @@
 'use client'
-import { Area } from '@/lib/types'
-import { BarChart2 } from 'lucide-react'
+import { useState } from 'react'
+import { Area, Priority, TaskStatus } from '@/lib/types'
+import { priorityColor } from '@/lib/utils'
+import { BarChart2, Moon, ChevronDown, ChevronRight } from 'lucide-react'
+
+const HOLD_COLOR = '#eab308'
 
 interface CompletedTask {
   id: string
@@ -8,10 +12,19 @@ interface CompletedTask {
   areas: Area[]
 }
 
+interface DormantTask {
+  id: string
+  title: string
+  created_at: string
+  status: TaskStatus
+  priority: Priority
+}
+
 interface Props {
   tasks: CompletedTask[]
   totalAllTime: number
   allAreas: Area[]
+  dormantTasks: DormantTask[]
 }
 
 function dateStr(iso: string): string {
@@ -35,10 +48,10 @@ function computeStreak(tasks: CompletedTask[]): number {
   return streak
 }
 
-function last7Days(): string[] {
-  return Array.from({ length: 7 }, (_, i) => {
+function lastNDays(n: number): string[] {
+  return Array.from({ length: n }, (_, i) => {
     const d = new Date()
-    d.setDate(d.getDate() - (6 - i))
+    d.setDate(d.getDate() - (n - 1 - i))
     return d.toISOString().split('T')[0]
   })
 }
@@ -50,24 +63,35 @@ function dayLabel(dateStr: string): string {
   return d.toLocaleDateString('en-US', { weekday: 'short' })
 }
 
-export default function InsightsClient({ tasks, totalAllTime, allAreas }: Props) {
-  const today = dateStr(new Date().toISOString())
-  const sevenDaysAgo = dateStr(new Date(Date.now() - 7 * 86400000).toISOString())
+export default function InsightsClient({ tasks, totalAllTime, allAreas, dormantTasks }: Props) {
+  const [dormantOpen, setDormantOpen] = useState(false)
+
+  const nowMs = Date.now()
+  const today = dateStr(new Date(nowMs).toISOString())
+  const sevenDaysAgo = dateStr(new Date(nowMs - 7 * 86400000).toISOString())
 
   const todayCount = tasks.filter(t => dateStr(t.completed_at) === today).length
   const weekTasks = tasks.filter(t => dateStr(t.completed_at) > sevenDaysAgo)
   const weekCount = weekTasks.length
   const streak = computeStreak(tasks)
-  const days = last7Days()
 
-  // daily breakdown (last 7 days)
-  const dailyCounts: Record<string, number> = {}
-  days.forEach(d => { dailyCounts[d] = 0 })
+  // daily breakdown (last 7 days), plus 6 days of lookback so day 1's
+  // trailing 7-day average has real data behind it instead of zero-padding
+  const days13 = lastNDays(13)
+  const counts13: Record<string, number> = {}
+  days13.forEach(d => { counts13[d] = 0 })
   tasks.forEach(t => {
     const d = dateStr(t.completed_at)
-    if (d in dailyCounts) dailyCounts[d]++
+    if (d in counts13) counts13[d]++
   })
-  const maxDaily = Math.max(...Object.values(dailyCounts), 1)
+  const days = days13.slice(6)
+  const dailyCounts = days.map(d => counts13[d])
+  const movingAvg = days.map((_, i) => {
+    const idx = i + 6
+    const window = days13.slice(idx - 6, idx + 1)
+    return window.reduce((s, d) => s + counts13[d], 0) / 7
+  })
+  const maxDaily = Math.max(...dailyCounts, ...movingAvg, 1)
 
   // area breakdown (last 7 days)
   const areaCountMap: Record<string, number> = {}
@@ -83,7 +107,17 @@ export default function InsightsClient({ tasks, totalAllTime, allAreas }: Props)
     .map(a => ({ area: a, count: areaCountMap[a.id] }))
     .sort((a, b) => b.count - a.count)
   if (noAreaCount > 0) areaRows.push({ area: null as unknown as Area, count: noAreaCount })
-  const maxArea = Math.max(...areaRows.map(r => r.count), 1)
+  const pieTotal = areaRows.reduce((s, r) => s + r.count, 0)
+
+  const pieCumPcts = areaRows.reduce<number[]>((acc, { count }) => (
+    [...acc, (acc[acc.length - 1] ?? 0) + (count / pieTotal) * 100]
+  ), [])
+  const pieStops = areaRows.map(({ area }, i) => {
+    const color = area ? area.color : '#888888'
+    const start = i === 0 ? 0 : pieCumPcts[i - 1]
+    return `${color} ${start}% ${pieCumPcts[i]}%`
+  })
+  const pieGradient = `conic-gradient(${pieStops.join(', ')})`
 
   const statCard = (label: string, value: number | string, sub?: string) => (
     <div style={{
@@ -95,6 +129,14 @@ export default function InsightsClient({ tasks, totalAllTime, allAreas }: Props)
       {sub && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1 }}>{sub}</div>}
     </div>
   )
+
+  // line chart geometry
+  const W = 300, H = 130, padX = 20, topY = 14, plotH = 74
+  const baseY = topY + plotH
+  const xAt = (i: number) => padX + i * (W - 2 * padX) / (days.length - 1)
+  const yAt = (v: number) => baseY - (v / maxDaily) * plotH
+  const linePath = dailyCounts.map((v, i) => `${i === 0 ? 'M' : 'L'}${xAt(i)},${yAt(v)}`).join(' ')
+  const avgPath = movingAvg.map((v, i) => `${i === 0 ? 'M' : 'L'}${xAt(i)},${yAt(v)}`).join(' ')
 
   return (
     <div style={{ minHeight: '100vh', paddingBottom: 80 }}>
@@ -131,69 +173,122 @@ export default function InsightsClient({ tasks, totalAllTime, allAreas }: Props)
           </div>
         </div>
 
-        {/* Daily bar chart */}
+        {/* Daily line chart */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 18px' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14 }}>
-            Last 7 days
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Last 7 days
+            </div>
+            <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-muted)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)' }} />
+                Completed
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <svg width={16} height={8}><line x1={0} y1={4} x2={16} y2={4} stroke="var(--text-muted)" strokeWidth={2} strokeDasharray="1 4" strokeLinecap="round" /></svg>
+                7-day avg
+              </span>
+            </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {days.map(d => {
-              const count = dailyCounts[d]
-              const pct = (count / maxDaily) * 100
-              const isToday = d === today
-              return (
-                <div key={d} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 11, fontWeight: isToday ? 700 : 500, color: isToday ? 'var(--accent)' : 'var(--text-muted)', width: 36, textAlign: 'right', flexShrink: 0 }}>
-                    {dayLabel(d)}
-                  </span>
-                  <div style={{ flex: 1, height: 10, background: 'var(--surface2)', borderRadius: 5, overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%', borderRadius: 5,
-                      width: `${pct}%`,
-                      background: isToday ? 'var(--accent)' : 'var(--accent)88',
-                      transition: 'width 0.3s ease',
-                    }} />
-                  </div>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: count > 0 ? 'var(--text)' : 'var(--text-dim)', width: 20, textAlign: 'right', flexShrink: 0 }}>
-                    {count}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
+          <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
+            <line x1={padX} y1={baseY} x2={W - padX} y2={baseY} stroke="var(--border)" strokeWidth={1} />
+            <path d={avgPath} fill="none" stroke="var(--text-muted)" strokeWidth={2} strokeDasharray="1 5" strokeLinecap="round" />
+            <path d={linePath} fill="none" stroke="var(--accent)" strokeWidth={2} />
+            {dailyCounts.map((v, i) => (
+              <circle key={days[i]} cx={xAt(i)} cy={yAt(v)} r={3} fill="var(--accent)" stroke="var(--surface)" strokeWidth={1.5}>
+                <title>{`${dayLabel(days[i])}: ${v}`}</title>
+              </circle>
+            ))}
+            {days.map((d, i) => (
+              <text key={d} x={xAt(i)} y={H - 4} fontSize={9} textAnchor="middle" fill={d === today ? 'var(--accent)' : 'var(--text-muted)'}>
+                {dayLabel(d)}
+              </text>
+            ))}
+          </svg>
         </div>
 
-        {/* Area breakdown */}
+        {/* Area breakdown — pie chart */}
         {areaRows.length > 0 && (
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 18px' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14 }}>
               By area · last 7 days
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {areaRows.map(({ area, count }) => {
-                const color = area ? area.color : '#888888'
-                const name = area ? area.name : 'No area'
-                const pct = (count / maxArea) * 100
-                return (
-                  <div key={area ? area.id : '__none__'} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, color, width: 72, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {name}
-                    </span>
-                    <div style={{ flex: 1, height: 10, background: 'var(--surface2)', borderRadius: 5, overflow: 'hidden' }}>
-                      <div style={{
-                        height: '100%', borderRadius: 5,
-                        width: `${pct}%`,
-                        background: color,
-                        transition: 'width 0.3s ease',
-                      }} />
+            <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', width: 130, height: 130, borderRadius: '50%', background: pieGradient, flexShrink: 0 }}>
+                <div style={{
+                  position: 'absolute', inset: 26, borderRadius: '50%', background: 'var(--surface)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)' }}>{pieTotal}</span>
+                  <span style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>tasks</span>
+                </div>
+              </div>
+              <div style={{ flex: 1, minWidth: 120, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {areaRows.map(({ area, count }) => {
+                  const color = area ? area.color : '#888888'
+                  const name = area ? area.name : 'No area'
+                  const pct = Math.round((count / pieTotal) * 100)
+                  return (
+                    <div key={area ? area.id : '__none__'} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                      <span style={{ width: 9, height: 9, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                      <span style={{ flex: 1, color: 'var(--text)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {name}
+                      </span>
+                      <span style={{ color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }}>
+                        {count} · {pct}%
+                      </span>
                     </div>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', width: 20, textAlign: 'right', flexShrink: 0 }}>
-                      {count}
-                    </span>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
             </div>
+          </div>
+        )}
+
+        {/* Dormant tasks */}
+        {dormantTasks.length > 0 && (
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+            <button
+              onClick={() => setDormantOpen(o => !o)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '16px 18px', background: 'none', border: 'none', cursor: 'pointer',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Moon size={14} color="var(--text-muted)" />
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Dormant tasks
+                </span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', background: 'var(--surface2)', borderRadius: 20, padding: '1px 8px' }}>
+                  {dormantTasks.length}
+                </span>
+              </div>
+              {dormantOpen ? <ChevronDown size={16} color="var(--text-muted)" /> : <ChevronRight size={16} color="var(--text-muted)" />}
+            </button>
+            {dormantOpen && (
+              <div style={{ padding: '0 18px 16px', display: 'flex', flexDirection: 'column' }}>
+                {dormantTasks.map(t => {
+                  const ageDays = Math.floor((nowMs - new Date(t.created_at).getTime()) / 86400000)
+                  return (
+                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: '1px solid var(--border)' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: priorityColor(t.priority), flexShrink: 0 }} />
+                      <span style={{ flex: 1, fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {t.title}
+                      </span>
+                      {t.status === 'holding' && (
+                        <span style={{ fontSize: 9, fontWeight: 700, color: HOLD_COLOR, background: `${HOLD_COLOR}22`, borderRadius: 20, padding: '1px 6px', flexShrink: 0 }}>
+                          HOLDING
+                        </span>
+                      )}
+                      <span style={{ fontSize: 11, color: 'var(--text-dim)', flexShrink: 0 }}>
+                        {ageDays}d
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 
