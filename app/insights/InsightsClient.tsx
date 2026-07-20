@@ -27,20 +27,27 @@ interface Props {
   userId: string
 }
 
+function localDateStr(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 function dateStr(iso: string): string {
-  return iso.split('T')[0]
+  return localDateStr(new Date(iso))
 }
 
 function computeStreak(tasks: CompletedTask[]): number {
   const dateSet = new Set(tasks.map(t => dateStr(t.completed_at)))
-  const today = dateStr(new Date().toISOString())
-  const yesterday = dateStr(new Date(Date.now() - 86400000).toISOString())
+  const today = localDateStr(new Date())
+  const yesterday = localDateStr(new Date(Date.now() - 86400000))
   if (!dateSet.has(today) && !dateSet.has(yesterday)) return 0
   const start = dateSet.has(today) ? today : yesterday
   let streak = 0
   const d = new Date(start + 'T00:00:00')
   while (true) {
-    const s = d.toISOString().split('T')[0]
+    const s = localDateStr(d)
     if (!dateSet.has(s)) break
     streak++
     d.setDate(d.getDate() - 1)
@@ -52,7 +59,7 @@ function lastNDays(n: number): string[] {
   return Array.from({ length: n }, (_, i) => {
     const d = new Date()
     d.setDate(d.getDate() - (n - 1 - i))
-    return d.toISOString().split('T')[0]
+    return localDateStr(d)
   })
 }
 
@@ -61,8 +68,12 @@ function dayLabel(d: string, todayStr: string): string {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short' })
 }
 
-function shortDateLabel(d: string): string {
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+function xAxisLabel(d: string, todayStr: string): string {
+  if (d === todayStr) return 'Today'
+  const date = new Date(d + 'T00:00:00')
+  const weekday = date.toLocaleDateString('en-US', { weekday: 'short' })
+  const md = date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })
+  return `${weekday} ${md}`
 }
 
 // picks a "nice" rounded max/step (1/2/5×10^n) so gridlines land on whole numbers
@@ -180,6 +191,11 @@ function DailyLineChart({ days, dailyCounts, movingAvg, todayStr }: {
             <text x={padLeft - 4} y={yAt(t) + 3} fontSize={8} textAnchor="end" fill="var(--text-dim)">{t}</text>
           </g>
         ))}
+        {days.map((d, i) => (
+          i % labelEvery === 0 && (
+            <line key={`vgrid-${d}`} x1={xAt(i)} y1={topY} x2={xAt(i)} y2={baseY} stroke="var(--border)" strokeWidth={1} />
+          )
+        ))}
         <path d={avgPath} fill="none" stroke="var(--text-muted)" strokeWidth={2} strokeDasharray="1 5" strokeLinecap="round" />
         <path d={linePath} fill="none" stroke="var(--accent)" strokeWidth={2} />
         {dailyCounts.map((v, i) => (
@@ -198,8 +214,8 @@ function DailyLineChart({ days, dailyCounts, movingAvg, todayStr }: {
         ))}
         {days.map((d, i) => (
           i % labelEvery === 0 && (
-            <text key={d} x={xAt(i)} y={H - 4} fontSize={9} textAnchor="middle" fill={d === todayStr ? 'var(--accent)' : 'var(--text-muted)'}>
-              {n > 10 ? shortDateLabel(d) : dayLabel(d, todayStr)}
+            <text key={d} x={xAt(i)} y={H - 4} fontSize={8} textAnchor="middle" fill={d === todayStr ? 'var(--accent)' : 'var(--text-muted)'}>
+              {xAxisLabel(d, todayStr)}
             </text>
           )
         ))}
@@ -272,9 +288,9 @@ export default function InsightsClient({ tasks, totalAllTime, allAreas, dormantT
   const router = useRouter()
 
   const nowMs = Date.now()
-  const today = dateStr(new Date(nowMs).toISOString())
-  const sevenDaysAgo = dateStr(new Date(nowMs - 7 * 86400000).toISOString())
-  const thirtyDaysAgo = dateStr(new Date(nowMs - 30 * 86400000).toISOString())
+  const today = localDateStr(new Date(nowMs))
+  const sevenDaysAgo = localDateStr(new Date(nowMs - 7 * 86400000))
+  const thirtyDaysAgo = localDateStr(new Date(nowMs - 30 * 86400000))
 
   const todayCount = tasks.filter(t => dateStr(t.completed_at) === today).length
   const weekTasks = tasks.filter(t => dateStr(t.completed_at) > sevenDaysAgo)
