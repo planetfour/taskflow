@@ -71,7 +71,7 @@ export default function ProjectsClient({ projects, allAreas, userId }: Props) {
       const sp = ps.filter(p => p.status === status)
       if (!sp.length) return null
       const priorityGroups = PRIORITY_ORDER
-        .map(priority => ({ priority, projects: sp.filter(p => p.priority === priority) }))
+        .map(priority => ({ priority, projects: sp.filter(p => p.priority === priority).sort((a, b) => a.name.localeCompare(b.name)) }))
         .filter(g => g.projects.length > 0)
       return { status, priorityGroups }
     }).filter(Boolean) as { status: ProjectStatus; priorityGroups: { priority: Priority; projects: Project[] }[] }[]
