@@ -169,7 +169,7 @@ export default function ProjectDetailClient({ project, tasks, allAreas, userId }
         )}
 
         {datedTasks.map(task => (
-          <TaskItem key={task.id} task={task} onRefresh={() => startTransition(() => router.refresh())} userId={userId} />
+          <TaskItem key={task.id} task={task} onRefresh={() => startTransition(() => router.refresh())} userId={userId} statusFilter={filterStatuses} />
         ))}
 
         {undatedTasks.length > 0 && (
@@ -180,7 +180,7 @@ export default function ProjectDetailClient({ project, tasks, allAreas, userId }
               </div>
             )}
             {undatedTasks.map(task => (
-              <TaskItem key={task.id} task={task} onRefresh={() => startTransition(() => router.refresh())} userId={userId} />
+              <TaskItem key={task.id} task={task} onRefresh={() => startTransition(() => router.refresh())} userId={userId} statusFilter={filterStatuses} />
             ))}
           </>
         )}

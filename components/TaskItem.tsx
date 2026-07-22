@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, startTransition } from 'react'
-import { Task } from '@/lib/types'
+import { Task, TaskStatus } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import PriorityBadge from './PriorityBadge'
 import DeadlineBadge from './DeadlineBadge'
@@ -17,9 +17,10 @@ interface Props {
   depth?: number
   onRefresh: () => void
   userId: string
+  statusFilter?: Set<TaskStatus>
 }
 
-export default function TaskItem({ task, depth = 0, onRefresh, userId }: Props) {
+export default function TaskItem({ task, depth = 0, onRefresh, userId, statusFilter }: Props) {
   const [localStatus, setLocalStatus] = useState(task.status)
   const [expanded, setExpanded] = useState(false)
   const [addingSubtask, setAddingSubtask] = useState(false)
@@ -27,7 +28,10 @@ export default function TaskItem({ task, depth = 0, onRefresh, userId }: Props) 
   const [editing, setEditing] = useState(false)
   const [snoozing, setSnoozing] = useState(false)
   const supabase = createClient()
-  const hasSubtasks = task.subtasks && task.subtasks.length > 0
+  const visibleSubtasks = (task.subtasks ?? []).filter(
+    sub => !statusFilter || statusFilter.size === 0 || statusFilter.has(sub.status)
+  )
+  const hasSubtasks = visibleSubtasks.length > 0
 
   useEffect(() => { setLocalStatus(task.status) }, [task.status])
 
@@ -152,8 +156,8 @@ export default function TaskItem({ task, depth = 0, onRefresh, userId }: Props) 
         )}
       </div>
 
-      {expanded && hasSubtasks && task.subtasks!.map(sub => (
-        <TaskItem key={sub.id} task={sub} depth={depth + 1} onRefresh={onRefresh} userId={userId} />
+      {expanded && hasSubtasks && visibleSubtasks.map(sub => (
+        <TaskItem key={sub.id} task={sub} depth={depth + 1} onRefresh={onRefresh} userId={userId} statusFilter={statusFilter} />
       ))}
 
       {editing && (
