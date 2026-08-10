@@ -51,6 +51,10 @@ export function recurrenceLabel(type: RecurrenceType | null, interval?: number |
     case 'weekly': return 'Weekly'
     case 'biweekly': return 'Every 2 weeks'
     case 'monthly': return 'Monthly'
+    case 'every_n_days': {
+      const n = interval ?? 1
+      return n === 1 ? 'Daily' : `Every ${n} days`
+    }
     case 'custom': {
       const mask = interval ?? 0
       if (!mask) return 'Custom'
@@ -81,6 +85,7 @@ export function nextDueDate(type: RecurrenceType, interval: number | null, fromD
     case 'weekly': d.setDate(d.getDate() + 7); break
     case 'biweekly': d.setDate(d.getDate() + 14); break
     case 'monthly': d.setMonth(d.getMonth() + 1); break
+    case 'every_n_days': d.setDate(d.getDate() + (interval && interval > 0 ? interval : 1)); break
     case 'custom': {
       const mask = interval ?? 31
       for (let i = 1; i <= 7; i++) {

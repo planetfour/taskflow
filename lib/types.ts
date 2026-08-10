@@ -1,7 +1,7 @@
 export type Priority = 'low' | 'medium' | 'high' | 'urgent'
 export type ProjectStatus = 'active' | 'paused' | 'completed' | 'archived'
 export type TaskStatus = 'todo' | 'holding' | 'done'
-export type RecurrenceType = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'custom'
+export type RecurrenceType = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'custom' | 'every_n_days'
 
 export interface Area {
   id: string

@@ -14,6 +14,7 @@ const OPTIONS: { value: RecurrenceType | null; label: string }[] = [
   { value: 'weekly', label: 'Weekly' },
   { value: 'biweekly', label: 'Biweekly' },
   { value: 'monthly', label: 'Monthly' },
+  { value: 'every_n_days', label: 'Every X days' },
   { value: 'custom', label: 'Custom days' },
 ]
 
@@ -37,12 +38,15 @@ export default function RecurrencePicker({ type, interval, onChange }: Props) {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: type === 'custom' ? 8 : 0 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: type === 'custom' || type === 'every_n_days' ? 8 : 0 }}>
         {OPTIONS.map(o => (
           <button key={String(o.value)} onClick={() => {
             if (o.value === 'custom') {
               const defaultMask = interval !== null && interval > 0 && interval <= 127 ? interval : 31
               onChange('custom', defaultMask)
+            } else if (o.value === 'every_n_days') {
+              const defaultInterval = interval !== null && interval > 0 ? interval : 3
+              onChange('every_n_days', defaultInterval)
             } else {
               onChange(o.value, null)
             }
@@ -70,6 +74,21 @@ export default function RecurrencePicker({ type, interval, onChange }: Props) {
               }}>{label}</button>
             )
           })}
+        </div>
+      )}
+      {type === 'every_n_days' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Every</span>
+          <input
+            type="number" min={1} max={365}
+            value={interval ?? 3}
+            onChange={e => onChange('every_n_days', Math.min(365, Math.max(1, parseInt(e.target.value) || 1)))}
+            style={{
+              width: 54, fontSize: 12, padding: '4px 6px', borderRadius: 6,
+              border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)',
+            }}
+          />
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>days</span>
         </div>
       )}
     </div>

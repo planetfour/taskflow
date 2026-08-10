@@ -147,18 +147,18 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId }:
         borderLeft: `3px solid ${borderColor}`,
         cursor: 'pointer',
       }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button onClick={e => { e.stopPropagation(); toggleDone(task) }} style={{
-            width: 20, height: 20, borderRadius: '50%', flexShrink: 0, marginTop: 1,
-            border: `2px solid ${done ? 'var(--accent)' : holding ? HOLD_COLOR : 'var(--border)'}`,
+            width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+            border: `2.5px solid ${done ? 'var(--accent)' : holding ? HOLD_COLOR : 'var(--border)'}`,
             background: done ? 'var(--accent)' : holding ? `${HOLD_COLOR}22` : 'transparent',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            {done && <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>✓</span>}
+            {done && <span style={{ color: '#fff', fontSize: 18, fontWeight: 700 }}>✓</span>}
             {holding && (
-              <div style={{ display: 'flex', gap: 2 }}>
-                <span style={{ width: 2, height: 7, borderRadius: 1, background: HOLD_COLOR, display: 'block' }} />
-                <span style={{ width: 2, height: 7, borderRadius: 1, background: HOLD_COLOR, display: 'block' }} />
+              <div style={{ display: 'flex', gap: 3 }}>
+                <span style={{ width: 3, height: 14, borderRadius: 1.5, background: HOLD_COLOR, display: 'block' }} />
+                <span style={{ width: 3, height: 14, borderRadius: 1.5, background: HOLD_COLOR, display: 'block' }} />
               </div>
             )}
           </button>
@@ -184,7 +184,7 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId }:
           </div>
           <button
             onClick={e => { e.stopPropagation(); setSnoozingTask(task) }}
-            style={{ flexShrink: 0, padding: 4, background: 'none', color: 'var(--text-dim)', marginTop: 1 }}
+            style={{ flexShrink: 0, padding: 4, background: 'none', color: 'var(--text-dim)' }}
             title="Snooze"
           >
             <AlarmClock size={15} />
