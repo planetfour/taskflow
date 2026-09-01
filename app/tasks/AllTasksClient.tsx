@@ -28,18 +28,18 @@ export default function AllTasksClient({ tasks, allAreas, userId }: Props) {
   const [editingTask, setEditingTask] = useState<TaskWithProject | null>(null)
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [localStatuses, setLocalStatuses] = useState<Record<string, TaskStatus>>({})
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const router = useRouter()
   const supabase = createClient()
 
   function toggleCollapse(id: string) {
-    setCollapsed(prev => {
+    setExpanded(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id); else next.add(id)
       return next
     })
   }
-  const isOpen = (id: string) => !collapsed.has(id)
+  const isOpen = (id: string) => expanded.has(id)
 
   function effectiveStatus(task: TaskWithProject): TaskStatus {
     return localStatuses[task.id] ?? task.status

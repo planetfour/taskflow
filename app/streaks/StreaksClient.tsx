@@ -83,10 +83,10 @@ function StreakCard({ s }: { s: StreakSeries }) {
 
 export default function StreaksClient({ groups }: Props) {
   const hasAny = groups.some(g => g.series.length > 0)
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   function toggleCollapse(id: string) {
-    setCollapsed(prev => {
+    setExpanded(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id); else next.add(id)
       return next
@@ -105,7 +105,7 @@ export default function StreaksClient({ groups }: Props) {
       <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 22 }}>
         {groups.map(({ area, series }) => {
           const key = area ? area.id : '__none__'
-          const isOpen = !collapsed.has(key)
+          const isOpen = expanded.has(key)
           return (
             <div key={key}>
               <button onClick={() => toggleCollapse(key)} style={{

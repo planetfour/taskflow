@@ -31,7 +31,7 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId }:
   const [editingTask, setEditingTask] = useState<TaskWithProject | null>(null)
   const [snoozingTask, setSnoozingTask] = useState<TaskWithProject | null>(null)
   const [localStatuses, setLocalStatuses] = useState<Record<string, TaskStatus>>({})
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   const router = useRouter()
   const supabase = createClient()
 
@@ -96,7 +96,7 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId }:
   }
 
   function toggleGroup(key: string) {
-    setCollapsedGroups(prev => ({ ...prev, [key]: !prev[key] }))
+    setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
   async function toggleDone(task: TaskWithProject) {
@@ -213,7 +213,7 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId }:
     const groups = groupByAreaThenProject(taskList)
     return groups.map(({ area, projects }) => {
       const groupKey = `${sectionKey}-${area?.id ?? 'none'}`
-      const isCollapsed = !!collapsedGroups[groupKey]
+      const isCollapsed = !expandedGroups[groupKey]
       const groupColor = area?.color ?? '#888888'
       const totalCount = projects.reduce((n, p) => n + p.tasks.length, 0)
       return (
@@ -240,7 +240,7 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId }:
           </button>
           {!isCollapsed && projects.map(({ project, tasks: ptasks }) => {
             const projectKey = `${groupKey}-${project?.id ?? 'no-project'}`
-            const projectCollapsed = !!collapsedGroups[projectKey]
+            const projectCollapsed = !expandedGroups[projectKey]
             return (
               <div key={project?.id ?? 'no-project'} style={{ marginBottom: 6 }}>
                 {projects.length > 1 && (

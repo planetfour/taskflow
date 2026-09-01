@@ -20,17 +20,17 @@ export default function ProjectsClient({ projects, allAreas, userId }: Props) {
   const [showNoProjectTaskModal, setShowNoProjectTaskModal] = useState(false)
   const [filterStatuses, setFilterStatuses] = useState<Set<ProjectStatus>>(new Set(['active', 'paused']))
   const [filterAreaIds, setFilterAreaIds] = useState<Set<string>>(new Set())
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const router = useRouter()
 
   function toggleCollapse(id: string) {
-    setCollapsed(prev => {
+    setExpanded(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id); else next.add(id)
       return next
     })
   }
-  const isOpen = (id: string) => !collapsed.has(id)
+  const isOpen = (id: string) => expanded.has(id)
 
   function toggleStatusFilter(s: ProjectStatus) {
     setFilterStatuses(prev => {
