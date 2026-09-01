@@ -238,23 +238,41 @@ export default function TodayClient({ tasks, recurringTasks, allAreas, userId }:
               {totalCount}
             </span>
           </button>
-          {!isCollapsed && projects.map(({ project, tasks: ptasks }) => (
-            <div key={project?.id ?? 'no-project'} style={{ marginBottom: 6 }}>
-              {projects.length > 1 && (
-                <div style={{
-                  fontSize: 10, fontWeight: 600,
-                  color: project?.color ?? 'var(--text-dim)',
-                  letterSpacing: '0.04em', textTransform: 'uppercase',
-                  paddingLeft: 19, marginBottom: 3,
-                  display: 'flex', alignItems: 'center', gap: 4,
-                }}>
-                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: project?.color ?? 'var(--text-dim)', flexShrink: 0 }} />
-                  {project?.name ?? 'No Project'}
-                </div>
-              )}
-              {ptasks.map(t => renderTask(t, showRecurrenceLabel))}
-            </div>
-          ))}
+          {!isCollapsed && projects.map(({ project, tasks: ptasks }) => {
+            const projectKey = `${groupKey}-${project?.id ?? 'no-project'}`
+            const projectCollapsed = !!collapsedGroups[projectKey]
+            return (
+              <div key={project?.id ?? 'no-project'} style={{ marginBottom: 6 }}>
+                {projects.length > 1 && (
+                  <button
+                    onClick={() => toggleGroup(projectKey)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      background: 'none', padding: 0, paddingLeft: 19, marginBottom: 3,
+                      width: '100%', textAlign: 'left', cursor: 'pointer',
+                    }}
+                  >
+                    {projectCollapsed
+                      ? <ChevronRight size={10} style={{ color: project?.color ?? 'var(--text-dim)', flexShrink: 0 }} />
+                      : <ChevronDown size={10} style={{ color: project?.color ?? 'var(--text-dim)', flexShrink: 0 }} />
+                    }
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: project?.color ?? 'var(--text-dim)', flexShrink: 0 }} />
+                    <span style={{
+                      fontSize: 10, fontWeight: 600,
+                      color: project?.color ?? 'var(--text-dim)',
+                      letterSpacing: '0.04em', textTransform: 'uppercase',
+                    }}>
+                      {project?.name ?? 'No Project'}
+                    </span>
+                    <span style={{ fontSize: 9, color: project?.color ?? 'var(--text-dim)', opacity: 0.6, fontWeight: 600 }}>
+                      {ptasks.length}
+                    </span>
+                  </button>
+                )}
+                {!projectCollapsed && ptasks.map(t => renderTask(t, showRecurrenceLabel))}
+              </div>
+            )
+          })}
         </div>
       )
     })

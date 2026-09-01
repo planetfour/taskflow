@@ -1,7 +1,8 @@
 'use client'
+import { useState } from 'react'
 import { Area, RecurrenceType } from '@/lib/types'
 import { formatCompletedAt, formatDeadline, recurrenceLabel } from '@/lib/utils'
-import { Flame } from 'lucide-react'
+import { Flame, ChevronDown, ChevronRight } from 'lucide-react'
 
 export interface StreakSeries {
   key: string
@@ -82,6 +83,15 @@ function StreakCard({ s }: { s: StreakSeries }) {
 
 export default function StreaksClient({ groups }: Props) {
   const hasAny = groups.some(g => g.series.length > 0)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+
+  function toggleCollapse(id: string) {
+    setCollapsed(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
 
   return (
     <div style={{ minHeight: '100vh', paddingBottom: 80 }}>
@@ -93,22 +103,33 @@ export default function StreaksClient({ groups }: Props) {
       </div>
 
       <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 22 }}>
-        {groups.map(({ area, series }) => (
-          <div key={area ? area.id : '__none__'}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10, padding: '0 2px' }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: area ? area.color : '#888888', flexShrink: 0 }} />
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                {area ? area.name : 'No area'}
-              </span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', background: 'var(--surface2)', borderRadius: 20, padding: '1px 8px' }}>
-                {series.length}
-              </span>
+        {groups.map(({ area, series }) => {
+          const key = area ? area.id : '__none__'
+          const isOpen = !collapsed.has(key)
+          return (
+            <div key={key}>
+              <button onClick={() => toggleCollapse(key)} style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 7, marginBottom: isOpen ? 10 : 0,
+                padding: '0 2px', background: 'none',
+              }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: area ? area.color : '#888888', flexShrink: 0 }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  {area ? area.name : 'No area'}
+                </span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', background: 'var(--surface2)', borderRadius: 20, padding: '1px 8px' }}>
+                  {series.length}
+                </span>
+                <div style={{ flex: 1 }} />
+                {isOpen ? <ChevronDown size={14} color="var(--text-dim)" /> : <ChevronRight size={14} color="var(--text-dim)" />}
+              </button>
+              {isOpen && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {series.map(s => <StreakCard key={s.key} s={s} />)}
+                </div>
+              )}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {series.map(s => <StreakCard key={s.key} s={s} />)}
-            </div>
-          </div>
-        ))}
+          )
+        })}
 
         {!hasAny && (
           <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
